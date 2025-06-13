@@ -7,6 +7,8 @@ const COLORS = {
   GREEN: "#00FF00",
   YELLOW: "#FFFF00",
   YELLOW_FLASH: "#FFFF00",
+  WHITE: "#FFFFFF",
+  CHEQUERED: null, // special case for gif
 };
 
 const DEFAULT_KEYBINDS = {
@@ -15,16 +17,55 @@ const DEFAULT_KEYBINDS = {
   GREEN: "F3",
   YELLOW: "F4",
   YELLOW_FLASH: "F5",
+  WHITE: "F6",
+  CHEQUERED: "F7",
 };
+
+function hexToRgb(hex) {
+  // Remove hash if present
+  hex = hex.replace(/^#/, "");
+  if (hex.length === 3) {
+    hex = hex
+      .split("")
+      .map((x) => x + x)
+      .join("");
+  }
+  const num = parseInt(hex, 16);
+  return [(num >> 16) & 255, (num >> 8) & 255, num & 255];
+}
+
+function rgbToHex([r, g, b]) {
+  return (
+    "#" +
+    [r, g, b]
+      .map((x) => {
+        const hex = x.toString(16);
+        return hex.length === 1 ? "0" + hex : hex;
+      })
+      .join("")
+  );
+}
+
+function adjustBrightness(hex, brightness) {
+  if (hex === "#000000") return hex;
+  const rgb = hexToRgb(hex);
+  const adjusted = rgb.map((c) => Math.round((c * brightness) / 100));
+  return rgbToHex(adjusted);
+}
 
 function App() {
   const [displayColor, setDisplayColor] = useState(COLORS.CLEAR);
   const [isFlashing, setIsFlashing] = useState(false);
+  const [lastAction, setLastAction] = useState("CLEAR");
   const [keybinds, setKeybinds] = useState(() => {
     const saved = localStorage.getItem("keybinds");
     return saved ? JSON.parse(saved) : DEFAULT_KEYBINDS;
   });
   const [waitingForKey, setWaitingForKey] = useState(null);
+  const [brightness, setBrightness] = useState(100);
+  const [prevBrightness, setPrevBrightness] = useState(100);
+  const [showChequered, setShowChequered] = useState(false);
+  const [prevShowChequered, setPrevShowChequered] = useState(false);
 
   // Flashing effect for yellow
   useEffect(() => {
@@ -35,15 +76,12 @@ function App() {
           prev === COLORS.YELLOW ? COLORS.CLEAR : COLORS.YELLOW
         );
       }, 500);
-    } else if (
-      displayColor === COLORS.YELLOW ||
-      displayColor === COLORS.CLEAR
-    ) {
+    } else if (lastAction === "YELLOW_FLASH") {
       setDisplayColor(COLORS.YELLOW);
     }
     return () => clearInterval(interval);
     // eslint-disable-next-line
-  }, [isFlashing]);
+  }, [isFlashing, lastAction]);
 
   // Listen for keydown events
   useEffect(() => {
@@ -60,6 +98,17 @@ function App() {
         e.preventDefault();
         return;
       }
+      // Brightness controls (NUMPAD + and -)
+      if (e.code === "NumpadAdd") {
+        setBrightness((b) => Math.min(100, b + 5));
+        e.preventDefault();
+        return;
+      }
+      if (e.code === "NumpadSubtract") {
+        setBrightness((b) => Math.max(1, b - 5));
+        e.preventDefault();
+        return;
+      }
       // Trigger button if key matches
       const action = Object.keys(keybinds).find(
         (k) => keybinds[k] === e.key.toUpperCase()
@@ -71,12 +120,39 @@ function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-    // eslint-disable-next-line
   }, [keybinds, waitingForKey]);
 
   const handleButton = (color) => {
+    setLastAction(color);
     setIsFlashing(color === "YELLOW_FLASH");
-    if (color !== "YELLOW_FLASH") setDisplayColor(COLORS[color]);
+
+    // Handle Chequered
+    if (color === "CHEQUERED") {
+      setPrevShowChequered(showChequered); // Save previous chequered state
+      setShowChequered(true);
+    } else {
+      // Restore previous chequered state if leaving chequered
+      if (lastAction === "CHEQUERED") {
+        setShowChequered(prevShowChequered);
+      } else {
+        setShowChequered(false);
+      }
+    }
+
+    // Handle White
+    if (color === "WHITE") {
+      setPrevBrightness(brightness); // Save current brightness
+      setBrightness(100); // Force white to 100%
+      setDisplayColor(COLORS.WHITE);
+    } else {
+      // Restore previous brightness if leaving white
+      if (lastAction === "WHITE") {
+        setBrightness(prevBrightness);
+      }
+      if (color !== "YELLOW_FLASH" && color !== "CHEQUERED") {
+        setDisplayColor(COLORS[color]);
+      }
+    }
   };
 
   return (
@@ -90,6 +166,10 @@ function App() {
               className={
                 action === "YELLOW_FLASH"
                   ? "bg-yellow-400 hover:bg-yellow-300 text-black text-2xl w-64 h-48 border-4 border-yellow-600 animate-pulse flex flex-col items-center justify-center"
+                  : action === "WHITE"
+                  ? "bg-white hover:bg-gray-200 text-black text-2xl w-64 h-48 flex flex-col items-center justify-center"
+                  : action === "CHEQUERED"
+                  ? "bg-gray-400 hover:bg-gray-300 text-black text-2xl w-64 h-48 flex flex-col items-center justify-center"
                   : `text-2xl w-64 h-48 flex flex-col items-center justify-center ${
                       action === "CLEAR"
                         ? "bg-gray-700 hover:bg-gray-600 text-white"
@@ -106,11 +186,11 @@ function App() {
               onClick={() => handleButton(action)}
             >
               <span>
-                {action
-                  .replace("_FLASH", " Flashing")
-                  .replace("_", " ")
-                  .toLowerCase()
-                  .replace(/^\w/, (c) => c.toUpperCase())}
+                {action === "YELLOW_FLASH"
+                  ? "Yellow Flashing"
+                  : action === "CHEQUERED"
+                  ? "Chequered"
+                  : action.charAt(0) + action.slice(1).toLowerCase()}
               </span>
               <span className="text-xs mt-2 text-gray-300">
                 {keybinds[action]}
@@ -120,17 +200,55 @@ function App() {
         </div>
       </div>
       {/* Right Panel */}
-      <div className="flex-1 relative">
+      <div className="flex-1 relative flex flex-col items-center justify-center">
         <div
-          className="absolute top-0 right-0 flex items-center justify-center"
+          className="absolute top-0 right-0 flex items-center justify-center overflow-hidden"
           style={{
             width: 40,
             height: 80,
-            background: displayColor,
+            background: showChequered
+              ? "#222"
+              : isFlashing
+              ? displayColor
+              : adjustBrightness(displayColor, brightness),
             transition: "background 0.2s",
             imageRendering: "pixelated",
           }}
-        />
+        >
+          {showChequered && (
+            <img
+              src="/chequered.gif"
+              alt="Chequered"
+              style={{
+                width: "40px",
+                height: "80px",
+                objectFit: "fill",
+                imageRendering: "pixelated",
+              }}
+            />
+          )}
+        </div>
+        {/* Vertical Brightness Slider */}
+        <div className="absolute top-0 right-16 flex flex-col items-center h-full justify-center">
+          <input
+            type="range"
+            min={1}
+            max={100}
+            step={1}
+            value={brightness}
+            onChange={(e) => setBrightness(Number(e.target.value))}
+            className="appearance-none w-32 h-2 bg-gray-700 rounded-lg outline-none slider-thumb-vertical"
+            style={{
+              writingMode: "bt-lr",
+              WebkitAppearance: "slider-vertical",
+              width: "2rem",
+              height: "200px",
+              marginTop: "100px",
+            }}
+          />
+          <span className="mt-4 text-xs text-gray-300">Brightness</span>
+          <span className="text-xs text-gray-400">{brightness}%</span>
+        </div>
       </div>
     </div>
   );
