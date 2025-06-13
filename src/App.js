@@ -62,10 +62,13 @@ function App() {
     return saved ? JSON.parse(saved) : DEFAULT_KEYBINDS;
   });
   const [waitingForKey, setWaitingForKey] = useState(null);
-  const [brightness, setBrightness] = useState(100);
-  const [prevBrightness, setPrevBrightness] = useState(100);
+  const [brightness, setBrightness] = useState(80); // Default to 80%
+  const [prevBrightness, setPrevBrightness] = useState(80); // Default to 80%
   const [showChequered, setShowChequered] = useState(false);
   const [prevShowChequered, setPrevShowChequered] = useState(false);
+  const [boxWidth, setBoxWidth] = useState(40);
+  const [boxHeight, setBoxHeight] = useState(80);
+  const [rebindMode, setRebindMode] = useState(false);
 
   // Flashing effect for yellow
   useEffect(() => {
@@ -122,16 +125,20 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [keybinds, waitingForKey]);
 
+  // Modified handleButton to support rebind mode
   const handleButton = (color) => {
+    if (rebindMode) {
+      setWaitingForKey(color);
+      return;
+    }
     setLastAction(color);
     setIsFlashing(color === "YELLOW_FLASH");
 
     // Handle Chequered
     if (color === "CHEQUERED") {
-      setPrevShowChequered(showChequered); // Save previous chequered state
+      setPrevShowChequered(showChequered);
       setShowChequered(true);
     } else {
-      // Restore previous chequered state if leaving chequered
       if (lastAction === "CHEQUERED") {
         setShowChequered(prevShowChequered);
       } else {
@@ -141,11 +148,10 @@ function App() {
 
     // Handle White
     if (color === "WHITE") {
-      setPrevBrightness(brightness); // Save current brightness
-      setBrightness(100); // Force white to 100%
+      setPrevBrightness(brightness);
+      setBrightness(100);
       setDisplayColor(COLORS.WHITE);
     } else {
-      // Restore previous brightness if leaving white
       if (lastAction === "WHITE") {
         setBrightness(prevBrightness);
       }
@@ -159,6 +165,20 @@ function App() {
     <div className="flex min-h-screen max-h-screen bg-gray-900 text-white">
       {/* Left Panel */}
       <div className="p-8">
+        <button
+          className={`mb-6 w-full h-12 text-lg font-bold ${
+            rebindMode
+              ? "bg-blue-600 text-white"
+              : "bg-gray-700 text-gray-200 hover:bg-gray-600"
+          }`}
+          style={{ borderRadius: 0 }}
+          onClick={() => {
+            setRebindMode((v) => !v);
+            setWaitingForKey(null);
+          }}
+        >
+          {rebindMode ? "Exit Keybind Mode" : "Keybind Mode"}
+        </button>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {Object.entries(COLORS).map(([action, color]) => (
             <button
@@ -184,6 +204,7 @@ function App() {
               }
               style={{ borderRadius: 0 }}
               onClick={() => handleButton(action)}
+              disabled={waitingForKey && waitingForKey !== action}
             >
               <span>
                 {action === "YELLOW_FLASH"
@@ -193,7 +214,7 @@ function App() {
                   : action.charAt(0) + action.slice(1).toLowerCase()}
               </span>
               <span className="text-xs mt-2 text-gray-300">
-                {keybinds[action]}
+                {waitingForKey === action ? "Press key..." : keybinds[action]}
               </span>
             </button>
           ))}
@@ -204,8 +225,8 @@ function App() {
         <div
           className="absolute top-0 right-0 flex items-center justify-center overflow-hidden"
           style={{
-            width: 40,
-            height: 80,
+            width: boxWidth,
+            height: boxHeight,
             background: showChequered
               ? "#222"
               : isFlashing
@@ -220,9 +241,9 @@ function App() {
               src="/chequered.gif"
               alt="Chequered"
               style={{
-                width: "40px",
-                height: "80px",
-                objectFit: "fill",
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
                 imageRendering: "pixelated",
               }}
             />
@@ -237,17 +258,41 @@ function App() {
             step={1}
             value={brightness}
             onChange={(e) => setBrightness(Number(e.target.value))}
-            className="appearance-none w-32 h-2 bg-gray-700 rounded-lg outline-none slider-thumb-vertical"
+            className="appearance-none w-8 h-48 bg-gray-700 rounded-lg outline-none"
             style={{
               writingMode: "bt-lr",
               WebkitAppearance: "slider-vertical",
-              width: "2rem",
-              height: "200px",
-              marginTop: "100px",
             }}
           />
           <span className="mt-4 text-xs text-gray-300">Brightness</span>
           <span className="text-xs text-gray-400">{brightness}%</span>
+          {/* Box Size Controls */}
+          <form className="mt-8 flex flex-col items-center gap-2 w-24">
+            <label className="flex flex-col items-center text-xs text-gray-300 w-full">
+              Width
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={boxWidth}
+                onChange={(e) => setBoxWidth(Number(e.target.value))}
+                className="mt-1 w-full px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-[10px] text-gray-400">px</span>
+            </label>
+            <label className="flex flex-col items-center text-xs text-gray-300 w-full">
+              Height
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={boxHeight}
+                onChange={(e) => setBoxHeight(Number(e.target.value))}
+                className="mt-1 w-full px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <span className="text-[10px] text-gray-400">px</span>
+            </label>
+          </form>
         </div>
       </div>
     </div>
