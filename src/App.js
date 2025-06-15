@@ -9,6 +9,7 @@ const COLORS = {
   YELLOW_FLASH: "#FFFF00",
   WHITE: "#FFFFFF",
   CHEQUERED: null, // special case for gif
+  FORM_UP: "#00BFFF", // Add a color for FORM UP (DeepSkyBlue)
 };
 
 const DEFAULT_KEYBINDS = {
@@ -19,6 +20,7 @@ const DEFAULT_KEYBINDS = {
   YELLOW_FLASH: "F5",
   WHITE: "F6",
   CHEQUERED: "F7",
+  FORM_UP: "F8", // Add a default keybind for FORM UP
 };
 
 function hexToRgb(hex) {
@@ -190,6 +192,8 @@ function App() {
                   ? "bg-white hover:bg-gray-200 text-black text-2xl w-64 h-48 flex flex-col items-center justify-center"
                   : action === "CHEQUERED"
                   ? "bg-gray-400 hover:bg-gray-300 text-black text-2xl w-64 h-48 flex flex-col items-center justify-center"
+                  : action === "FORM_UP"
+                  ? "bg-blue-400 hover:bg-blue-300 text-black text-2xl w-64 h-48 flex flex-col items-center justify-center"
                   : `text-2xl w-64 h-48 flex flex-col items-center justify-center ${
                       action === "CLEAR"
                         ? "bg-gray-700 hover:bg-gray-600 text-white"
@@ -211,6 +215,8 @@ function App() {
                   ? "Yellow Flashing"
                   : action === "CHEQUERED"
                   ? "Chequered"
+                  : action === "FORM_UP"
+                  ? "FORM UP"
                   : action.charAt(0) + action.slice(1).toLowerCase()}
               </span>
               <span className="text-xs mt-2 text-gray-300">
@@ -227,11 +233,14 @@ function App() {
           style={{
             width: boxWidth,
             height: boxHeight,
-            background: showChequered
-              ? "#222"
-              : isFlashing
-              ? displayColor
-              : adjustBrightness(displayColor, brightness),
+            background:
+              lastAction === "FORM_UP"
+                ? "#000" // Black background for FORM UP
+                : showChequered
+                ? "#222"
+                : isFlashing
+                ? displayColor
+                : adjustBrightness(displayColor, brightness),
             transition: "background 0.2s",
             imageRendering: "pixelated",
           }}
@@ -247,6 +256,27 @@ function App() {
                 imageRendering: "pixelated",
               }}
             />
+          )}
+          {/* Show "FORM UP" text if FORM_UP is active */}
+          {lastAction === "FORM_UP" && (
+                        <span
+              style={{
+                color: "#fff",
+                fontWeight: "bold",
+                // Responsive font size: 60% of box height, but max 90% of box width divided by 8 (letters in "FORM UP")
+                fontSize: `min(${Math.round(boxHeight * 0.6)}px, ${Math.round(
+                  (boxWidth * 0.9) / 8
+                )}px)`,
+                textShadow: "2px 2px 8px #000",
+                letterSpacing: "0.1em",
+                whiteSpace: "nowrap",
+                textAlign: "center",
+                width: "100%",
+                lineHeight: 1,
+              }}
+            >
+              FORM UP
+            </span>
           )}
         </div>
         {/* Vertical Brightness Slider */}
