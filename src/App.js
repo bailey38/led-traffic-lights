@@ -63,7 +63,7 @@ function getWebSocket() {
   return ws;
 }
 
-function App() {
+function LEDMaster() {
   const [displayColor, setDisplayColor] = useState(COLORS.CLEAR);
   const [isFlashing, setIsFlashing] = useState(false);
   const [lastAction, setLastAction] = useState("CLEAR");
@@ -440,4 +440,4 @@ function App() {
   );
 }
 
-export default App;
+export default LEDMaster;
