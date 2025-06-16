@@ -244,41 +244,49 @@ function LEDMaster() {
     });
   };
 
+  // Split buttons into columns
+  const column1 = ["CLEAR", "GREEN", "RED", "YELLOW", "YELLOW_FLASH"];
+  const column2 = ["WHITE", "CHEQUERED", "FORM_UP"];
+
   return (
     <div className="flex min-h-screen max-h-screen bg-gray-900 text-white">
-      {/* Left Panel */}
-      <div className="p-8">
-        {/* Flag Status Indicator */}
+      {/* Column 1 */}
+      <div className="flex flex-col items-center justify-start w-1/3 p-8 border-r border-gray-800">
         <div
           className="mb-8 text-4xl font-extrabold text-center tracking-wide select-none"
           style={{
-            color:
-              lastAction === "RED"
-                ? "#FF0000"
-                : lastAction === "GREEN"
-                ? "#00FF00"
-                : lastAction === "YELLOW" || lastAction === "YELLOW_FLASH"
-                ? "#FFD600"
-                : lastAction === "WHITE"
-                ? "#FFFFFF"
-                : lastAction === "CHEQUERED"
-                ? "#888"
-                : lastAction === "FORM_UP"
-                ? "#00BFFF"
-                : "#AAA",
+            color: "#AAA", // Always gray for "Flag Status:"
             textShadow: "0 2px 8px #000, 0 0px 2px #000",
           }}
         >
           Flag Status:{" "}
-          {lastAction === "YELLOW_FLASH"
-            ? "Yellow Flashing"
-            : lastAction === "CHEQUERED"
-            ? "Chequered"
-            : lastAction === "FORM_UP"
-            ? "FORM UP"
-            : lastAction.charAt(0) + lastAction.slice(1).toLowerCase()}
+          <span
+            style={{
+              color:
+                lastAction === "RED"
+                  ? "#FF0000"
+                  : lastAction === "GREEN"
+                  ? "#00FF00"
+                  : lastAction === "YELLOW" || lastAction === "YELLOW_FLASH"
+                  ? "#FFD600"
+                  : lastAction === "WHITE"
+                  ? "#FFFFFF"
+                  : lastAction === "CHEQUERED"
+                  ? "#888"
+                  : lastAction === "FORM_UP"
+                  ? "#00BFFF"
+                  : "#AAA",
+            }}
+          >
+            {lastAction === "YELLOW_FLASH"
+              ? "Yellow Flashing"
+              : lastAction === "CHEQUERED"
+              ? "Chequered"
+              : lastAction === "FORM_UP"
+              ? "FORM UP"
+              : lastAction.charAt(0) + lastAction.slice(1).toLowerCase()}
+          </span>
         </div>
-        {/* Keybind Mode Button */}
         <button
           className={`mb-6 w-full h-12 text-lg font-bold ${
             rebindMode
@@ -293,30 +301,22 @@ function LEDMaster() {
         >
           {rebindMode ? "Exit Keybind Mode" : "Keybind Mode"}
         </button>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {Object.entries(COLORS).map(([action, color]) => (
+        <div className="flex flex-col gap-6 w-full">
+          {column1.map((action) => (
             <button
               key={action}
               className={
                 action === "YELLOW_FLASH"
-                  ? "bg-yellow-400 hover:bg-yellow-300 text-black text-2xl w-64 h-48 border-4 border-yellow-600 animate-pulse flex flex-col items-center justify-center"
-                  : action === "WHITE"
-                  ? "bg-white hover:bg-gray-200 text-black text-2xl w-64 h-48 flex flex-col items-center justify-center"
-                  : action === "CHEQUERED"
-                  ? "bg-gray-400 hover:bg-gray-300 text-black text-2xl w-64 h-48 flex flex-col items-center justify-center"
-                  : action === "FORM_UP"
-                  ? "bg-blue-400 hover:bg-blue-300 text-black text-2xl w-64 h-48 flex flex-col items-center justify-center"
-                  : `text-2xl w-64 h-48 flex flex-col items-center justify-center ${
-                      action === "CLEAR"
-                        ? "bg-gray-700 hover:bg-gray-600 text-white"
-                        : action === "RED"
-                        ? "bg-red-600 hover:bg-red-500 text-white"
-                        : action === "GREEN"
-                        ? "bg-green-600 hover:bg-green-500 text-white"
-                        : action === "YELLOW"
-                        ? "bg-yellow-400 hover:bg-yellow-300 text-black"
-                        : ""
-                    }`
+                  ? "bg-yellow-400 hover:bg-yellow-300 text-black text-2xl w-full h-24 border-4 border-yellow-600 animate-pulse flex flex-col items-center justify-center"
+                  : action === "CLEAR"
+                  ? "bg-gray-700 hover:bg-gray-600 text-white text-2xl w-full h-24 flex flex-col items-center justify-center"
+                  : action === "RED"
+                  ? "bg-red-600 hover:bg-red-500 text-white text-2xl w-full h-24 flex flex-col items-center justify-center"
+                  : action === "GREEN"
+                  ? "bg-green-600 hover:bg-green-500 text-white text-2xl w-full h-24 flex flex-col items-center justify-center"
+                  : action === "YELLOW"
+                  ? "bg-yellow-400 hover:bg-yellow-300 text-black text-2xl w-full h-24 flex flex-col items-center justify-center"
+                  : ""
               }
               style={{ borderRadius: 0 }}
               onClick={() => handleButton(action)}
@@ -325,7 +325,36 @@ function LEDMaster() {
               <span>
                 {action === "YELLOW_FLASH"
                   ? "Yellow Flashing"
+                  : action.charAt(0) + action.slice(1).toLowerCase()}
+              </span>
+              <span className="text-xs mt-2 text-gray-300">
+                {waitingForKey === action ? "Press key..." : keybinds[action]}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+      {/* Column 2 */}
+      <div className="flex flex-col items-center justify-center w-1/3 p-8 border-r border-gray-800">
+        <div className="flex flex-col gap-6 w-full">
+          {column2.map((action) => (
+            <button
+              key={action}
+              className={
+                action === "WHITE"
+                  ? "bg-white hover:bg-gray-200 text-black text-2xl w-full h-24 flex flex-col items-center justify-center"
                   : action === "CHEQUERED"
+                  ? "bg-gray-400 hover:bg-gray-300 text-black text-2xl w-full h-24 flex flex-col items-center justify-center"
+                  : action === "FORM_UP"
+                  ? "bg-blue-400 hover:bg-blue-300 text-black text-2xl w-full h-24 flex flex-col items-center justify-center"
+                  : ""
+              }
+              style={{ borderRadius: 0 }}
+              onClick={() => handleButton(action)}
+              disabled={waitingForKey && waitingForKey !== action}
+            >
+              <span>
+                {action === "CHEQUERED"
                   ? "Chequered"
                   : action === "FORM_UP"
                   ? "FORM UP"
@@ -338,8 +367,8 @@ function LEDMaster() {
           ))}
         </div>
       </div>
-      {/* Right Panel */}
-      <div className="flex-1 relative flex flex-col items-center justify-center">
+      {/* Column 3: Output */}
+      <div className="flex-1 flex flex-col items-center justify-center relative">
         <div
           className="absolute top-0 right-0 flex items-center justify-center overflow-hidden"
           style={{
@@ -369,7 +398,6 @@ function LEDMaster() {
               }}
             />
           )}
-          {/* Show "FORM UP" text if FORM_UP is active */}
           {lastAction === "FORM_UP" && (
             <span
               style={{
@@ -391,7 +419,7 @@ function LEDMaster() {
           )}
         </div>
         {/* Vertical Brightness Slider */}
-        <div className="absolute top-0 right-16 flex flex-col items-center h-full justify-center">
+        <div className="absolute top-0 left-8 flex flex-col items-center h-full justify-center">
           <input
             type="range"
             min={1}
