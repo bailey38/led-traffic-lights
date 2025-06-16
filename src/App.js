@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 const COLORS = {
@@ -9,7 +9,7 @@ const COLORS = {
   YELLOW_FLASH: "#FFFF00",
   WHITE: "#FFFFFF",
   CHEQUERED: null, // special case for gif
-  FORM_UP: "#00BFFF", // Add a color for FORM UP (DeepSkyBlue)
+  FORM_UP: "#00BFFF",
 };
 
 const DEFAULT_KEYBINDS = {
@@ -20,11 +20,10 @@ const DEFAULT_KEYBINDS = {
   YELLOW_FLASH: "F5",
   WHITE: "F6",
   CHEQUERED: "F7",
-  FORM_UP: "F8", // Add a default keybind for FORM UP
+  FORM_UP: "F8",
 };
 
 function hexToRgb(hex) {
-  // Remove hash if present
   hex = hex.replace(/^#/, "");
   if (hex.length === 3) {
     hex = hex
@@ -55,6 +54,15 @@ function adjustBrightness(hex, brightness) {
   return rgbToHex(adjusted);
 }
 
+// --- WebSocket Master Logic ---
+let ws;
+function getWebSocket() {
+  if (!ws || ws.readyState > 1) {
+    ws = new window.WebSocket("ws://localhost:8080");
+  }
+  return ws;
+}
+
 function App() {
   const [displayColor, setDisplayColor] = useState(COLORS.CLEAR);
   const [isFlashing, setIsFlashing] = useState(false);
@@ -64,13 +72,44 @@ function App() {
     return saved ? JSON.parse(saved) : DEFAULT_KEYBINDS;
   });
   const [waitingForKey, setWaitingForKey] = useState(null);
-  const [brightness, setBrightness] = useState(80); // Default to 80%
-  const [prevBrightness, setPrevBrightness] = useState(80); // Default to 80%
+  const [brightness, setBrightness] = useState(80);
+  const [prevBrightness, setPrevBrightness] = useState(80);
   const [showChequered, setShowChequered] = useState(false);
   const [prevShowChequered, setPrevShowChequered] = useState(false);
   const [boxWidth, setBoxWidth] = useState(40);
   const [boxHeight, setBoxHeight] = useState(80);
   const [rebindMode, setRebindMode] = useState(false);
+
+  // For sending state only after state is updated
+  const stateRef = useRef();
+  stateRef.current = {
+    action: lastAction,
+    brightness,
+    boxWidth,
+    boxHeight,
+  };
+
+  // Send state to slave
+  function sendToSlave(data) {
+    const socket = getWebSocket();
+    const payload = JSON.stringify(data);
+    if (socket.readyState === 1) {
+      socket.send(payload);
+    } else {
+      socket.onopen = () => socket.send(payload);
+    }
+  }
+
+  // Send state on every relevant change
+  useEffect(() => {
+    sendToSlave({
+      action: lastAction,
+      brightness,
+      boxWidth,
+      boxHeight,
+    });
+    // eslint-disable-next-line
+  }, [lastAction, brightness, boxWidth, boxHeight]);
 
   // Flashing effect for yellow
   useEffect(() => {
@@ -106,12 +145,10 @@ function App() {
       // Brightness controls (NUMPAD + and -)
       if (e.code === "NumpadAdd") {
         setBrightness((b) => Math.min(100, b + 5));
-        e.preventDefault();
         return;
       }
       if (e.code === "NumpadSubtract") {
         setBrightness((b) => Math.max(1, b - 5));
-        e.preventDefault();
         return;
       }
       // Trigger button if key matches
@@ -125,9 +162,10 @@ function App() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line
   }, [keybinds, waitingForKey]);
 
-  // Modified handleButton to support rebind mode
+  // Modified handleButton to support rebind mode and master send
   const handleButton = (color) => {
     if (rebindMode) {
       setWaitingForKey(color);
@@ -161,12 +199,86 @@ function App() {
         setDisplayColor(COLORS[color]);
       }
     }
+    // Send state after handling
+    setTimeout(() => {
+      sendToSlave({
+        action: color,
+        brightness:
+          color === "WHITE"
+            ? 100
+            : lastAction === "WHITE"
+            ? prevBrightness
+            : brightness,
+        boxWidth,
+        boxHeight,
+      });
+    }, 0);
+  };
+
+  // Handlers for brightness and box size changes (send to slave)
+  const handleBrightnessChange = (val) => {
+    setBrightness(val);
+    sendToSlave({
+      action: lastAction,
+      brightness: val,
+      boxWidth,
+      boxHeight,
+    });
+  };
+  const handleBoxWidthChange = (val) => {
+    setBoxWidth(val);
+    sendToSlave({
+      action: lastAction,
+      brightness,
+      boxWidth: val,
+      boxHeight,
+    });
+  };
+  const handleBoxHeightChange = (val) => {
+    setBoxHeight(val);
+    sendToSlave({
+      action: lastAction,
+      brightness,
+      boxWidth,
+      boxHeight: val,
+    });
   };
 
   return (
     <div className="flex min-h-screen max-h-screen bg-gray-900 text-white">
       {/* Left Panel */}
       <div className="p-8">
+        {/* Flag Status Indicator */}
+        <div
+          className="mb-8 text-4xl font-extrabold text-center tracking-wide select-none"
+          style={{
+            color:
+              lastAction === "RED"
+                ? "#FF0000"
+                : lastAction === "GREEN"
+                ? "#00FF00"
+                : lastAction === "YELLOW" || lastAction === "YELLOW_FLASH"
+                ? "#FFD600"
+                : lastAction === "WHITE"
+                ? "#FFFFFF"
+                : lastAction === "CHEQUERED"
+                ? "#888"
+                : lastAction === "FORM_UP"
+                ? "#00BFFF"
+                : "#AAA",
+            textShadow: "0 2px 8px #000, 0 0px 2px #000",
+          }}
+        >
+          Flag Status:{" "}
+          {lastAction === "YELLOW_FLASH"
+            ? "Yellow Flashing"
+            : lastAction === "CHEQUERED"
+            ? "Chequered"
+            : lastAction === "FORM_UP"
+            ? "FORM UP"
+            : lastAction.charAt(0) + lastAction.slice(1).toLowerCase()}
+        </div>
+        {/* Keybind Mode Button */}
         <button
           className={`mb-6 w-full h-12 text-lg font-bold ${
             rebindMode
@@ -235,7 +347,7 @@ function App() {
             height: boxHeight,
             background:
               lastAction === "FORM_UP"
-                ? "#000" // Black background for FORM UP
+                ? "#000"
                 : showChequered
                 ? "#222"
                 : isFlashing
@@ -259,11 +371,10 @@ function App() {
           )}
           {/* Show "FORM UP" text if FORM_UP is active */}
           {lastAction === "FORM_UP" && (
-                        <span
+            <span
               style={{
                 color: "#fff",
                 fontWeight: "bold",
-                // Responsive font size: 60% of box height, but max 90% of box width divided by 8 (letters in "FORM UP")
                 fontSize: `min(${Math.round(boxHeight * 0.6)}px, ${Math.round(
                   (boxWidth * 0.9) / 8
                 )}px)`,
@@ -287,7 +398,7 @@ function App() {
             max={100}
             step={1}
             value={brightness}
-            onChange={(e) => setBrightness(Number(e.target.value))}
+            onChange={(e) => handleBrightnessChange(Number(e.target.value))}
             className="appearance-none w-8 h-48 bg-gray-700 rounded-lg outline-none"
             style={{
               writingMode: "bt-lr",
@@ -305,7 +416,7 @@ function App() {
                 min={1}
                 max={500}
                 value={boxWidth}
-                onChange={(e) => setBoxWidth(Number(e.target.value))}
+                onChange={(e) => handleBoxWidthChange(Number(e.target.value))}
                 className="mt-1 w-full px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-[10px] text-gray-400">px</span>
@@ -317,7 +428,7 @@ function App() {
                 min={1}
                 max={500}
                 value={boxHeight}
-                onChange={(e) => setBoxHeight(Number(e.target.value))}
+                onChange={(e) => handleBoxHeightChange(Number(e.target.value))}
                 className="mt-1 w-full px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
               <span className="text-[10px] text-gray-400">px</span>
