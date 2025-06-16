@@ -58,7 +58,7 @@ function adjustBrightness(hex, brightness) {
 let ws;
 function getWebSocket() {
   if (!ws || ws.readyState > 1) {
-    ws = new window.WebSocket("ws://localhost:8080");
+    ws = new window.WebSocket("ws://127.0.0.1:8080");
   }
   return ws;
 }
