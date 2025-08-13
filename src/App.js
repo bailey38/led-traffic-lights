@@ -260,7 +260,19 @@ function LEDMaster() {
       : "#AAA";
 
   return (
-    <div className="flex min-h-screen max-h-screen bg-gray-900 text-white relative">
+    <div
+      className="flex min-h-screen max-h-screen bg-gray-900 text-white relative overflow-hidden"
+      style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+    >
+      <style jsx>{`
+        body::-webkit-scrollbar {
+          display: none;
+        }
+        html {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+      `}</style>
       {/* Traffic Lights Display - Top Left */}
       <div className="absolute top-0 left-0 flex flex-col items-center pointer-events-none">
         <div
