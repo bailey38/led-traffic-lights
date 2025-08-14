@@ -274,7 +274,7 @@ function LEDMaster() {
         }
       `}</style>
       {/* Traffic Lights Display - Top Left */}
-      <div className="absolute top-0 left-0 flex flex-col items-center pointer-events-none">
+      <div className="absolute top-0 left-0 flex flex-col items-center pointer-events-none led-display-area">
         <div
           className="flex items-center justify-center overflow-hidden"
           style={{
@@ -294,7 +294,6 @@ function LEDMaster() {
                   ),
             transition: "background 0.2s",
             imageRendering: "pixelated",
-            cursor: "none",
           }}
         >
           {(trafficLightAction === "CHEQUERED" ||
@@ -314,7 +313,7 @@ function LEDMaster() {
       </div>
 
       {/* Flag Stand Display - Top Right */}
-      <div className="absolute top-0 right-0 flex flex-col items-center pointer-events-none">
+      <div className="absolute top-0 right-0 flex flex-col items-center pointer-events-none led-display-area">
         <div
           className="flex items-center justify-center overflow-hidden"
           style={{
@@ -337,7 +336,6 @@ function LEDMaster() {
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            cursor: "none",
           }}
         >
           {(flagStandAction === "CHEQUERED" || flagStandShowChequered) &&

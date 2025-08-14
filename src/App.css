@@ -36,3 +36,12 @@
     transform: rotate(360deg);
   }
 }
+
+/* Hide cursor over LED display areas */
+.led-display-area {
+  cursor: none !important;
+}
+
+.led-display-area * {
+  cursor: none !important;
+}
