@@ -9,7 +9,6 @@ const COLORS = {
   YELLOW_FLASH: "#FFFF00",
   WHITE: "#FFFFFF",
   CHEQUERED: null,
-  FORM_UP: "#00BFFF",
 };
 
 function hexToRgb(hex) {
@@ -50,8 +49,8 @@ function LEDMaster() {
   const [isFlashing, setIsFlashing] = useState(false);
   const [flagStandIsFlashing, setFlagStandIsFlashing] = useState(false);
 
-  const [brightness, setBrightness] = useState(80);
-  const [prevBrightness, setPrevBrightness] = useState(80);
+  const [brightness, setBrightness] = useState(100);
+  const [prevBrightness, setPrevBrightness] = useState(100);
   const [flagStandBrightness, setFlagStandBrightness] = useState(80);
   const [flagStandPrevBrightness, setFlagStandPrevBrightness] = useState(80);
   const [showChequered, setShowChequered] = useState(false);
@@ -72,10 +71,7 @@ function LEDMaster() {
     useState(flagStandBoxWidth);
   const [pendingFlagStandBoxHeight, setPendingFlagStandBoxHeight] =
     useState(flagStandBoxHeight);
-
-  // Add state for black flag number
-  const [blackFlagNumber, setBlackFlagNumber] = useState("");
-  const [showBlackFlag, setShowBlackFlag] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // For sending state only after state is updated
   const stateRef = useRef();
@@ -122,12 +118,12 @@ function LEDMaster() {
         return;
       }
       if (e.key === "F2") {
-        handleButton("RED");
+        handleButton("GREEN");
         e.preventDefault();
         return;
       }
       if (e.key === "F3") {
-        handleButton("GREEN");
+        handleButton("RED");
         e.preventDefault();
         return;
       }
@@ -142,17 +138,27 @@ function LEDMaster() {
         return;
       }
       if (e.key === "F6") {
-        handleButton("WHITE");
+        handleButton("CLEAR_FLAG_STAND");
         e.preventDefault();
         return;
       }
       if (e.key === "F7") {
-        handleButton("CHEQUERED");
+        handleButton("WHITE");
         e.preventDefault();
         return;
       }
       if (e.key === "F8") {
-        handleButton("FORM_UP");
+        handleButton("CHEQUERED");
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "F9") {
+        setShowSettingsModal(!showSettingsModal);
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Escape" && showSettingsModal) {
+        setShowSettingsModal(false);
         e.preventDefault();
         return;
       }
@@ -172,19 +178,20 @@ function LEDMaster() {
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
     // eslint-disable-next-line
-  }, []);
+  }, [showSettingsModal]);
 
   // Button handlers
   const handleButton = (action) => {
-    if (action === "BLACK_FLAG") {
-      setShowBlackFlag(true);
+    // Handle separate flag stand clear
+    if (action === "CLEAR_FLAG_STAND") {
+      setFlagStandAction("CLEAR");
+      setFlagStandIsFlashing(false);
+      setFlagStandShowChequered(false);
       return;
-    } else {
-      setShowBlackFlag(false);
     }
 
     // If it's a flag stand only action
-    if (["WHITE", "FORM_UP"].includes(action)) {
+    if (["WHITE", "CHEQUERED"].includes(action)) {
       // Save previous brightness for white
       if (action === "WHITE") {
         setFlagStandPrevBrightness(flagStandBrightness);
@@ -193,27 +200,24 @@ function LEDMaster() {
         setFlagStandBrightness(flagStandPrevBrightness);
       }
       setFlagStandAction(action);
-      setFlagStandShowChequered(false);
+      setFlagStandShowChequered(action === "CHEQUERED");
       setFlagStandIsFlashing(false);
       // The traffic lights remain as they are
-    } else if (
-      ["CHEQUERED", "YELLOW", "YELLOW_FLASH", "RED", "CLEAR"].includes(action)
-    ) {
-      // These should override the flag stand if it's currently showing a
-      // flag stand only flag
+    } else if (["YELLOW", "YELLOW_FLASH", "RED", "CLEAR"].includes(action)) {
+      // These should override both traffic lights and flag stand
       setTrafficLightAction(action);
       setIsFlashing(action === "YELLOW_FLASH");
-      setTrafficLightShowChequered(action === "CHEQUERED");
+      setTrafficLightShowChequered(false);
       setFlagStandAction(action);
       setFlagStandIsFlashing(action === "YELLOW_FLASH");
-      setFlagStandShowChequered(action === "CHEQUERED");
+      setFlagStandShowChequered(false);
     } else if (action === "GREEN") {
       // Green does NOT override flag stand if it's showing a flag stand only flag
       setTrafficLightAction(action);
       setIsFlashing(false);
       setTrafficLightShowChequered(false);
       // Only update flag stand if it's not showing a flag stand only flag
-      if (!["WHITE", "FORM_UP"].includes(flagStandAction)) {
+      if (!["WHITE", "CHEQUERED"].includes(flagStandAction)) {
         setFlagStandAction(action);
         setFlagStandIsFlashing(false);
         setFlagStandShowChequered(false);
@@ -239,9 +243,30 @@ function LEDMaster() {
     setFlagStandBoxHeight(val);
   };
 
-  // Split buttons into columns
-  const column1 = ["CLEAR", "GREEN", "RED", "YELLOW", "YELLOW_FLASH"];
-  const column2 = ["WHITE", "CHEQUERED", "FORM_UP"];
+  // Split buttons into traffic lights and flag stand
+  const trafficLightButtons = [
+    "CLEAR",
+    "GREEN",
+    "RED",
+    "YELLOW",
+    "YELLOW_FLASH",
+  ];
+  const flagStandButtons = ["CLEAR_FLAG_STAND", "WHITE", "CHEQUERED"];
+
+  // Combined array for horizontal layout (kept for compatibility)
+  const allButtons = [...trafficLightButtons, ...flagStandButtons];
+
+  // Keybind mappings
+  const keybindMap = {
+    CLEAR: "F1",
+    GREEN: "F2",
+    RED: "F3",
+    YELLOW: "F4",
+    YELLOW_FLASH: "F5",
+    CLEAR_FLAG_STAND: "F6",
+    WHITE: "F7",
+    CHEQUERED: "F8",
+  };
 
   // Helper for color
   const getColor = (action) =>
@@ -255,8 +280,6 @@ function LEDMaster() {
       ? "#FFFFFF"
       : action === "CHEQUERED"
       ? "#888"
-      : action === "FORM_UP"
-      ? "#00BFFF"
       : "#AAA";
 
   return (
@@ -273,73 +296,33 @@ function LEDMaster() {
           -ms-overflow-style: none;
         }
       `}</style>
-      {/* Traffic Lights Display - Top Left */}
-      <div className="absolute top-0 left-0 flex flex-col items-center pointer-events-none led-display-area">
-        <div
-          className="flex items-center justify-center overflow-hidden"
-          style={{
-            width: trafficLightBoxWidth,
-            height: trafficLightBoxHeight,
-            background:
-              trafficLightAction === "FORM_UP"
-                ? "#000"
-                : trafficLightAction === "CHEQUERED" ||
-                  trafficLightShowChequered
-                ? "#222"
-                : trafficLightAction === "YELLOW_FLASH"
-                ? COLORS.YELLOW
-                : adjustBrightness(
-                    COLORS[trafficLightAction] || "#000",
-                    brightness
-                  ),
-            transition: "background 0.2s",
-            imageRendering: "pixelated",
-          }}
-        >
-          {(trafficLightAction === "CHEQUERED" ||
-            trafficLightShowChequered) && (
-            <img
-              src="/chequered.gif"
-              alt="Chequered"
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                imageRendering: "pixelated",
-              }}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Flag Stand Display - Top Right */}
-      <div className="absolute top-0 right-0 flex flex-col items-center pointer-events-none led-display-area">
-        <div
-          className="flex items-center justify-center overflow-hidden"
-          style={{
-            width: flagStandBoxWidth,
-            height: flagStandBoxHeight,
-            background:
-              flagStandAction === "FORM_UP" || showBlackFlag
-                ? "#000"
-                : flagStandAction === "CHEQUERED" || flagStandShowChequered
-                ? "#222"
-                : flagStandAction === "YELLOW_FLASH"
-                ? COLORS.YELLOW
-                : adjustBrightness(
-                    COLORS[flagStandAction] || "#000",
-                    flagStandBrightness
-                  ),
-            transition: "background 0.2s",
-            imageRendering: "pixelated",
-            position: "relative",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {(flagStandAction === "CHEQUERED" || flagStandShowChequered) &&
-            !showBlackFlag && (
+      {/* Reserved Output Area - 320px height */}
+      <div
+        className="absolute top-0 left-0 w-full h-80 bg-transparent border-b border-gray-800 led-display-area"
+        style={{ cursor: "none" }}
+      >
+        {/* Traffic Lights Display - Top Left */}
+        <div className="absolute top-0 left-0 flex flex-col items-center pointer-events-none led-display-area">
+          <div
+            className="flex items-center justify-center overflow-hidden"
+            style={{
+              width: trafficLightBoxWidth,
+              height: trafficLightBoxHeight,
+              background:
+                trafficLightAction === "CHEQUERED" || trafficLightShowChequered
+                  ? "#222"
+                  : trafficLightAction === "YELLOW_FLASH"
+                  ? COLORS.YELLOW
+                  : adjustBrightness(
+                      COLORS[trafficLightAction] || "#000",
+                      brightness
+                    ),
+              transition: "background 0.2s",
+              imageRendering: "pixelated",
+            }}
+          >
+            {(trafficLightAction === "CHEQUERED" ||
+              trafficLightShowChequered) && (
               <img
                 src="/chequered.gif"
                 alt="Chequered"
@@ -351,253 +334,334 @@ function LEDMaster() {
                 }}
               />
             )}
-          {flagStandAction === "FORM_UP" && !showBlackFlag && (
-            <div
-              style={{
-                color: "#fff",
-                fontWeight: "bold",
-                fontSize: "8px",
-                textShadow: "1px 1px 4px #000",
-                letterSpacing: "0.05em",
-                whiteSpace: "nowrap",
-                textAlign: "center",
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              FORM UP
-            </div>
-          )}
-          {showBlackFlag && (
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "100%",
-                height: "100%",
-              }}
-            >
-              <span
-                style={{
-                  color: "#fff",
-                  fontWeight: "bold",
-                  fontSize: "6px",
-                  textShadow: "1px 1px 4px #000",
-                  letterSpacing: "0.05em",
-                  marginBottom: "2px",
-                  width: "100%",
-                  textAlign: "center",
-                }}
-              >
-                BLACK FLAG
-              </span>
-              <span
-                style={{
-                  color: "#fff",
-                  fontWeight: "bold",
-                  fontSize: "8px",
-                  textShadow: "1px 1px 4px #000",
-                  letterSpacing: "0.05em",
-                  whiteSpace: "nowrap",
-                  textAlign: "center",
-                  width: "100%",
-                }}
-              >
-                #{blackFlagNumber}
-              </span>
-            </div>
-          )}
+          </div>
         </div>
-      </div>
 
-      {/* Column 1 */}
-      <div className="flex flex-col items-center justify-start w-1/3 p-8 border-r border-gray-800">
-        <div className="mb-4 text-2xl font-extrabold text-center tracking-wide select-none text-gray-400">
-          Traffic Lights
-        </div>
-        <div className="flex flex-col gap-3 w-full mb-8">
-          {column1.map((action) => (
-            <button
-              key={action}
-              className={
-                action === "YELLOW_FLASH"
-                  ? "bg-yellow-400 hover:bg-yellow-300 text-black text-lg w-full h-12 border-4 border-yellow-600 animate-pulse flex items-center justify-center"
-                  : action === "CLEAR"
-                  ? "bg-gray-700 hover:bg-gray-600 text-white text-lg w-full h-12 flex items-center justify-center"
-                  : action === "RED"
-                  ? "bg-red-600 hover:bg-red-500 text-white text-lg w-full h-12 flex items-center justify-center"
-                  : action === "GREEN"
-                  ? "bg-green-600 hover:bg-green-500 text-white text-lg w-full h-12 flex items-center justify-center"
-                  : action === "YELLOW"
-                  ? "bg-yellow-400 hover:bg-yellow-300 text-black text-lg w-full h-12 flex items-center justify-center"
-                  : action === "CHEQUERED"
-                  ? "bg-gray-400 hover:bg-gray-300 text-black text-lg w-full h-12 flex items-center justify-center"
-                  : ""
-              }
-              style={{ borderRadius: 0 }}
-              onClick={() => handleButton(action)}
-            >
-              {action === "YELLOW_FLASH"
-                ? "Yellow Flashing"
-                : action === "CHEQUERED"
-                ? "Chequered"
-                : action.charAt(0) + action.slice(1).toLowerCase()}
-            </button>
-          ))}
-        </div>
-      </div>
-      {/* Column 2 */}
-      <div className="flex flex-col items-center justify-start w-1/3 p-8 border-r border-gray-800">
-        <div className="mb-4 text-2xl font-extrabold text-center tracking-wide select-none text-gray-400">
-          Flag Stand
-        </div>
-        <div className="flex flex-col gap-2 w-full mb-8">
-          {column2.map((action) => (
-            <button
-              key={action}
-              className={
-                action === "WHITE"
-                  ? "bg-white hover:bg-gray-200 text-black text-lg w-full h-12 flex items-center justify-center"
-                  : action === "CHEQUERED"
-                  ? "bg-gray-400 hover:bg-gray-300 text-black text-lg w-full h-12 flex items-center justify-center"
-                  : action === "FORM_UP"
-                  ? "bg-blue-400 hover:bg-blue-300 text-black text-lg w-full h-12 flex items-center justify-center"
-                  : ""
-              }
-              style={{ borderRadius: 0 }}
-              onClick={() => handleButton(action)}
-            >
-              {action === "CHEQUERED"
-                ? "Chequered"
-                : action === "FORM_UP"
-                ? "FORM UP"
-                : action.charAt(0) + action.slice(1).toLowerCase()}
-            </button>
-          ))}
-          {/* BLACK FLAG BUTTON */}
-          <button
-            className="bg-black hover:bg-gray-800 text-white text-lg w-full h-12 flex items-center justify-center border-4 border-gray-700 mt-2"
-            style={{ borderRadius: 0 }}
-            onClick={() => handleButton("BLACK_FLAG")}
+        {/* Flag Stand Display - Top Right */}
+        <div className="absolute top-0 right-0 flex flex-col items-center pointer-events-none led-display-area">
+          <div
+            className="flex items-center justify-center overflow-hidden"
+            style={{
+              width: flagStandBoxWidth,
+              height: flagStandBoxHeight,
+              background:
+                flagStandAction === "CHEQUERED" || flagStandShowChequered
+                  ? "#222"
+                  : flagStandAction === "YELLOW_FLASH"
+                  ? COLORS.YELLOW
+                  : adjustBrightness(
+                      COLORS[flagStandAction] || "#000",
+                      flagStandBrightness
+                    ),
+              transition: "background 0.2s",
+              imageRendering: "pixelated",
+              position: "relative",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
           >
-            BLACK FLAG
+            {(flagStandAction === "CHEQUERED" || flagStandShowChequered) && (
+              <img
+                src="/chequered.gif"
+                alt="Chequered"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  imageRendering: "pixelated",
+                }}
+              />
+            )}
+          </div>
+        </div>
+      </div>{" "}
+      {/* Button Area - starts below the 320px reserved area */}
+      <div
+        className="flex flex-col w-full"
+        style={{ marginTop: "320px", padding: "16px" }}
+      >
+        {/* Settings Toggle Button */}
+        <div className="flex justify-end mb-4">
+          <button
+            onClick={() => setShowSettingsModal(!showSettingsModal)}
+            className="bg-blue-600 hover:bg-blue-500 text-white text-sm px-4 py-2 flex items-center justify-center"
+            style={{ borderRadius: 0 }}
+          >
+            <span>Settings (F9)</span>
           </button>
-          <div className="w-full flex flex-col items-center mt-2">
-            <div className="relative w-1/2">
-              <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 select-none pointer-events-none">
-                #
-              </span>
-              <input
-                type="text"
-                className="pl-7 pr-3 py-2 w-full rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 text-center"
-                placeholder="Enter number or text"
-                value={blackFlagNumber}
-                onChange={(e) => setBlackFlagNumber(e.target.value)}
-                maxLength={12}
-              />
-            </div>
+        </div>
+
+        {/* Horizontal Button Layout */}
+        <div className="flex flex-col gap-4">
+          {/* Traffic Light Buttons - First Row */}
+          <div className="flex flex-wrap gap-3 justify-start">
+            {trafficLightButtons.map((action) => (
+              <button
+                key={action}
+                className={
+                  action === "YELLOW_FLASH"
+                    ? "bg-yellow-400 hover:bg-yellow-300 text-black text-lg border-4 border-yellow-600 flex items-center justify-center"
+                    : action === "CLEAR"
+                    ? "bg-gray-700 hover:bg-gray-600 text-white text-lg flex items-center justify-center"
+                    : action === "RED"
+                    ? "bg-red-600 hover:bg-red-500 text-white text-lg flex items-center justify-center"
+                    : action === "GREEN"
+                    ? "bg-green-600 hover:bg-green-500 text-white text-lg flex items-center justify-center"
+                    : action === "YELLOW"
+                    ? "bg-yellow-400 hover:bg-yellow-300 text-black text-lg flex items-center justify-center"
+                    : ""
+                }
+                style={{
+                  borderRadius: 0,
+                  width: "calc(50% - 6px)", // Half width minus gap
+                  height: "96px", // Double the current 48px height
+                  minWidth: "140px", // Minimum width for readability
+                  maxWidth: "200px", // Maximum width to prevent overly wide buttons
+                }}
+                onClick={() => handleButton(action)}
+              >
+                <div className="flex flex-col items-center">
+                  <span className="text-xl font-bold">
+                    {action === "YELLOW_FLASH"
+                      ? "Yellow Flashing"
+                      : action.charAt(0) + action.slice(1).toLowerCase()}
+                  </span>
+                  <span className="text-xs mt-1 opacity-75">
+                    {keybindMap[action]}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Flag Stand Buttons - Second Row */}
+          <div className="flex flex-wrap gap-3 justify-start">
+            {flagStandButtons.map((action) => (
+              <button
+                key={action}
+                className={
+                  action === "CHEQUERED"
+                    ? "bg-gray-400 hover:bg-gray-300 text-black text-lg flex items-center justify-center"
+                    : action === "WHITE"
+                    ? "bg-white hover:bg-gray-200 text-black text-lg flex items-center justify-center"
+                    : action === "CLEAR_FLAG_STAND"
+                    ? "bg-gray-700 hover:bg-gray-600 text-white text-lg flex items-center justify-center"
+                    : ""
+                }
+                style={{
+                  borderRadius: 0,
+                  width: "calc(50% - 6px)", // Half width minus gap
+                  height: "96px", // Double the current 48px height
+                  minWidth: "140px", // Minimum width for readability
+                  maxWidth: "200px", // Maximum width to prevent overly wide buttons
+                }}
+                onClick={() => handleButton(action)}
+              >
+                <div className="flex flex-col items-center">
+                  <span className="text-xl font-bold">
+                    {action === "CHEQUERED"
+                      ? "Chequered"
+                      : action === "CLEAR_FLAG_STAND"
+                      ? "Clear Flag Stand"
+                      : action.charAt(0) + action.slice(1).toLowerCase()}
+                  </span>
+                  <span className="text-xs mt-1 opacity-75">
+                    {keybindMap[action]}
+                  </span>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>
-      {/* Column 3: Controls */}
-      <div className="flex-1 flex flex-col items-center justify-start relative p-8">
-        <div className="mb-4 text-2xl font-extrabold text-center tracking-wide select-none text-gray-400">
-          Settings & Controls
-        </div>
-        {/* Box Size Controls for both displays, centered */}
-        <div className="w-full flex flex-col items-center justify-center mt-4 gap-4">
-          {/* Traffic Light Box Size */}
-          <div className="flex flex-row items-center gap-4 w-auto justify-center">
-            <span className="text-xs text-gray-400 mr-2">
-              Traffic Lights Size:
-            </span>
-            <label className="flex flex-col items-center text-xs text-gray-300">
-              Width
-              <input
-                type="number"
-                min={1}
-                max={320}
-                value={trafficLightBoxWidth}
-                onChange={(e) => {
-                  const newWidth = Number(e.target.value);
-                  setTrafficLightBoxWidth(newWidth);
-                }}
-                className="mt-1 w-16 px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </label>
-            <label className="flex flex-col items-center text-xs text-gray-300">
-              Height
-              <input
-                type="number"
-                min={1}
-                max={320}
-                value={trafficLightBoxHeight}
-                onChange={(e) => {
-                  const newHeight = Number(e.target.value);
-                  setTrafficLightBoxHeight(newHeight);
-                }}
-                className="mt-1 w-16 px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </label>
-          </div>
-          {/* Flag Stand Box Size */}
-          <div className="flex flex-row items-center gap-4 w-auto justify-center">
-            <span className="text-xs text-gray-400 mr-2">Flag Stand Size:</span>
-            <label className="flex flex-col items-center text-xs text-gray-300">
-              Width
-              <input
-                type="number"
-                min={1}
-                max={320}
-                value={flagStandBoxWidth}
-                onChange={(e) => {
-                  const newWidth = Number(e.target.value);
-                  setFlagStandBoxWidth(newWidth);
-                }}
-                className="mt-1 w-16 px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </label>
-            <label className="flex flex-col items-center text-xs text-gray-300">
-              Height
-              <input
-                type="number"
-                min={1}
-                max={500}
-                value={flagStandBoxHeight}
-                onChange={(e) => {
-                  const newHeight = Number(e.target.value);
-                  setFlagStandBoxHeight(newHeight);
-                }}
-                className="mt-1 w-16 px-2 py-1 rounded bg-gray-800 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </label>
-          </div>
-          {/* Horizontal Brightness Slider above the keybind button */}
-          <div className="flex flex-col items-center w-2/3 py-2">
-            <input
-              type="range"
-              min={1}
-              max={100}
-              step={1}
-              value={brightness}
-              onChange={(e) => handleBrightnessChange(Number(e.target.value))}
-              className="appearance-none w-full h-4 bg-gray-700 rounded-lg outline-none"
-              style={{
-                marginBottom: 4,
-              }}
-            />
-            <div className="flex flex-row justify-between w-full text-xs text-gray-300">
-              <span>Brightness</span>
-              <span className="text-gray-400">{brightness}%</span>
+      {/* Settings Modal */}
+      {showSettingsModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowSettingsModal(false)}
+        >
+          <div
+            className="bg-gray-800 p-8 rounded max-w-lg w-full mx-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-white">
+                Settings & Controls
+              </h2>
+              <button
+                onClick={() => setShowSettingsModal(false)}
+                className="text-gray-400 hover:text-white text-2xl"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              {/* Traffic Light Box Size */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-gray-300">
+                  Traffic Lights Size
+                </h3>
+                <div className="flex gap-4">
+                  <label className="flex flex-col items-center text-sm text-gray-300">
+                    Width
+                    <input
+                      type="number"
+                      min={1}
+                      max={320}
+                      value={trafficLightBoxWidth}
+                      onChange={(e) => {
+                        const newWidth = Number(e.target.value);
+                        setTrafficLightBoxWidth(newWidth);
+                      }}
+                      className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                  <label className="flex flex-col items-center text-sm text-gray-300">
+                    Height
+                    <input
+                      type="number"
+                      min={1}
+                      max={320}
+                      value={trafficLightBoxHeight}
+                      onChange={(e) => {
+                        const newHeight = Number(e.target.value);
+                        setTrafficLightBoxHeight(newHeight);
+                      }}
+                      className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Flag Stand Box Size */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-gray-300">
+                  Flag Stand Size
+                </h3>
+                <div className="flex gap-4">
+                  <label className="flex flex-col items-center text-sm text-gray-300">
+                    Width
+                    <input
+                      type="number"
+                      min={1}
+                      max={320}
+                      value={flagStandBoxWidth}
+                      onChange={(e) => {
+                        const newWidth = Number(e.target.value);
+                        setFlagStandBoxWidth(newWidth);
+                      }}
+                      className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                  <label className="flex flex-col items-center text-sm text-gray-300">
+                    Height
+                    <input
+                      type="number"
+                      min={1}
+                      max={320}
+                      value={flagStandBoxHeight}
+                      onChange={(e) => {
+                        const newHeight = Number(e.target.value);
+                        setFlagStandBoxHeight(newHeight);
+                      }}
+                      className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </label>
+                </div>
+              </div>
+
+              {/* Brightness Control */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-gray-300">
+                  Brightness
+                </h3>
+                <div className="flex flex-col space-y-2">
+                  <input
+                    type="range"
+                    min={1}
+                    max={100}
+                    step={1}
+                    value={brightness}
+                    onChange={(e) =>
+                      handleBrightnessChange(Number(e.target.value))
+                    }
+                    className="appearance-none w-full h-4 bg-gray-700 rounded-lg outline-none"
+                  />
+                  <div className="flex justify-between text-sm text-gray-300">
+                    <span>Brightness</span>
+                    <span className="text-gray-400">{brightness}%</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Keybinds Section */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-gray-300">
+                  Keybinds
+                </h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-gray-300">
+                      <span>Clear:</span>
+                      <span className="text-blue-400">F1</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Green:</span>
+                      <span className="text-blue-400">F2</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Red:</span>
+                      <span className="text-blue-400">F3</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Yellow:</span>
+                      <span className="text-blue-400">F4</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Settings:</span>
+                      <span className="text-blue-400">F9</span>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-gray-300">
+                      <span>Yellow Flash:</span>
+                      <span className="text-blue-400">F5</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Clear Flag:</span>
+                      <span className="text-blue-400">F6</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>White:</span>
+                      <span className="text-blue-400">F7</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Chequered:</span>
+                      <span className="text-blue-400">F8</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Brightness:</span>
+                      <span className="text-blue-400">NUM +/-</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-4">
+                <button
+                  onClick={() => setShowSettingsModal(false)}
+                  className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-sm"
+                >
+                  Close (ESC/F9)
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
