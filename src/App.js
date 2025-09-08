@@ -191,7 +191,7 @@ function LEDMaster() {
     }
 
     // If it's a flag stand only action
-    if (["WHITE", "CHEQUERED"].includes(action)) {
+    if (["WHITE"].includes(action)) {
       // Save previous brightness for white
       if (action === "WHITE") {
         setFlagStandPrevBrightness(flagStandBrightness);
@@ -200,9 +200,17 @@ function LEDMaster() {
         setFlagStandBrightness(flagStandPrevBrightness);
       }
       setFlagStandAction(action);
-      setFlagStandShowChequered(action === "CHEQUERED");
+      setFlagStandShowChequered(false);
       setFlagStandIsFlashing(false);
       // The traffic lights remain as they are
+    } else if (["CHEQUERED"].includes(action)) {
+      // Chequered works on both sides
+      setTrafficLightAction(action);
+      setIsFlashing(false);
+      setTrafficLightShowChequered(true);
+      setFlagStandAction(action);
+      setFlagStandIsFlashing(false);
+      setFlagStandShowChequered(true);
     } else if (["YELLOW", "YELLOW_FLASH", "RED", "CLEAR"].includes(action)) {
       // These should override both traffic lights and flag stand
       setTrafficLightAction(action);
@@ -217,7 +225,7 @@ function LEDMaster() {
       setIsFlashing(false);
       setTrafficLightShowChequered(false);
       // Only update flag stand if it's not showing a flag stand only flag
-      if (!["WHITE", "CHEQUERED"].includes(flagStandAction)) {
+      if (!["WHITE"].includes(flagStandAction)) {
         setFlagStandAction(action);
         setFlagStandIsFlashing(false);
         setFlagStandShowChequered(false);
@@ -250,6 +258,7 @@ function LEDMaster() {
     "RED",
     "YELLOW",
     "YELLOW_FLASH",
+    "CHEQUERED",
   ];
   const flagStandButtons = ["CLEAR_FLAG_STAND", "WHITE", "CHEQUERED"];
 
