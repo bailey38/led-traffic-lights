@@ -4,7 +4,7 @@ import "./App.css";
 const COLORS = {
   CLEAR: "#000000",
   RED: "#FF0000",
-  GREEN: "#00ff00ff",
+  GREEN: "#66ff00",
   YELLOW: "#FFFF00",
   YELLOW_FLASH: "#FFFF00",
   WHITE: "#FFFFFF",
