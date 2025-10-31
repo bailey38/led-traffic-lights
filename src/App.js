@@ -42,7 +42,28 @@ function adjustBrightness(hex, brightness) {
   return rgbToHex(adjusted);
 }
 
-function LEDMaster() {
+// Calculate font size based on box dimensions and text length
+function calculateFontSize(boxWidth, boxHeight, textLength) {
+  const minDimension = Math.min(boxWidth, boxHeight);
+  // Base size is reduced to fit better on x-axis
+  let baseFontSize = 50; // Reduced from 80
+  
+  // Adjust based on text length
+  if (textLength > 2) {
+    baseFontSize = 40;
+  }
+  if (textLength > 4) {
+    baseFontSize = 30;
+  }
+  if (textLength > 6) {
+    baseFontSize = 22;
+  }
+  if (textLength > 8) {
+    baseFontSize = 18;
+  }
+  
+  return baseFontSize;
+}function LEDMaster() {
   // State for both statuses
   const [trafficLightAction, setTrafficLightAction] = useState("CLEAR");
   const [flagStandAction, setFlagStandAction] = useState("CLEAR");
@@ -51,8 +72,8 @@ function LEDMaster() {
 
   const [brightness, setBrightness] = useState(100);
   const [prevBrightness, setPrevBrightness] = useState(100);
-  const [flagStandBrightness, setFlagStandBrightness] = useState(80);
-  const [flagStandPrevBrightness, setFlagStandPrevBrightness] = useState(80);
+  const [flagStandBrightness, setFlagStandBrightness] = useState(100);
+  const [flagStandPrevBrightness, setFlagStandPrevBrightness] = useState(100);
   const [showChequered, setShowChequered] = useState(false);
   const [trafficLightShowChequered, setTrafficLightShowChequered] =
     useState(false);
@@ -62,7 +83,7 @@ function LEDMaster() {
   const [trafficLightBoxWidth, setTrafficLightBoxWidth] = useState(80);
   const [trafficLightBoxHeight, setTrafficLightBoxHeight] = useState(40);
   const [flagStandBoxWidth, setFlagStandBoxWidth] = useState(80);
-  const [flagStandBoxHeight, setFlagStandBoxHeight] = useState(40);
+  const [flagStandBoxHeight, setFlagStandBoxHeight] = useState(80);
   const [pendingTrafficLightBoxWidth, setPendingTrafficLightBoxWidth] =
     useState(trafficLightBoxWidth);
   const [pendingTrafficLightBoxHeight, setPendingTrafficLightBoxHeight] =
@@ -70,8 +91,17 @@ function LEDMaster() {
   const [pendingFlagStandBoxWidth, setPendingFlagStandBoxWidth] =
     useState(flagStandBoxWidth);
   const [pendingFlagStandBoxHeight, setPendingFlagStandBoxHeight] =
-    useState(flagStandBoxHeight);
+    useState(80);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+
+  // Custom text modal states
+  const [showTextModal, setShowTextModal] = useState(false);
+  const [selectedFlag, setSelectedFlag] = useState("");
+  const [customText, setCustomText] = useState("");
+  const [currentCustomText, setCurrentCustomText] = useState("");
+  const [isRotatingFlag, setIsRotatingFlag] = useState(false);
+  const [showFlagInRotation, setShowFlagInRotation] = useState(true);
+  const [lastEnteredTexts, setLastEnteredTexts] = useState([]);
 
   // For sending state only after state is updated
   const stateRef = useRef();
@@ -107,6 +137,17 @@ function LEDMaster() {
     }
     return () => clearInterval(interval);
   }, [flagStandIsFlashing]);
+
+  // Rotating effect for custom text flags
+  useEffect(() => {
+    let interval;
+    if (isRotatingFlag) {
+      interval = setInterval(() => {
+        setShowFlagInRotation((prev) => !prev);
+      }, 750);
+    }
+    return () => clearInterval(interval);
+  }, [isRotatingFlag]);
 
   // Listen for keydown events
   useEffect(() => {
@@ -157,6 +198,36 @@ function LEDMaster() {
         e.preventDefault();
         return;
       }
+      if (e.key === "F10") {
+        handleButton("PASSING");
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "F11") {
+        handleButton("RULE_INFRINGEMENT");
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "F12") {
+        handleButton("NOISE_FLAG");
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Insert") {
+        handleButton("FIRE_FLAG");
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Delete") {
+        handleButton("MECHANICAL_DEFECT");
+        e.preventDefault();
+        return;
+      }
+      if (e.key === "Home") {
+        handleButton("BLACK_FLAG");
+        e.preventDefault();
+        return;
+      }
       if (e.key === "Escape" && showSettingsModal) {
         setShowSettingsModal(false);
         e.preventDefault();
@@ -182,16 +253,42 @@ function LEDMaster() {
 
   // Button handlers
   const handleButton = (action) => {
+    // Check if this is a flag that requires custom text
+    if (
+      [
+        "RULE_INFRINGEMENT",
+        "NOISE_FLAG",
+        "FIRE_FLAG",
+        "BLACK_FLAG",
+        "MECHANICAL_DEFECT",
+      ].includes(action)
+    ) {
+      setSelectedFlag(action);
+      setShowTextModal(true);
+      return;
+    }
+
     // Handle separate flag stand clear
     if (action === "CLEAR_FLAG_STAND") {
       setFlagStandAction("CLEAR");
       setFlagStandIsFlashing(false);
       setFlagStandShowChequered(false);
+      setIsRotatingFlag(false);
       return;
     }
 
     // If it's a flag stand only action
-    if (["WHITE"].includes(action)) {
+    if (
+      [
+        "WHITE",
+        "PASSING",
+        "RULE_INFRINGEMENT",
+        "NOISE_FLAG",
+        "FIRE_FLAG",
+        "MECHANICAL_DEFECT",
+        "BLACK_FLAG",
+      ].includes(action)
+    ) {
       // Save previous brightness for white
       if (action === "WHITE") {
         setFlagStandPrevBrightness(flagStandBrightness);
@@ -204,13 +301,11 @@ function LEDMaster() {
       setFlagStandIsFlashing(false);
       // The traffic lights remain as they are
     } else if (["CHEQUERED"].includes(action)) {
-      // Chequered works on both sides
-      setTrafficLightAction(action);
-      setIsFlashing(false);
-      setTrafficLightShowChequered(true);
+      // Chequered is flag stand only now
       setFlagStandAction(action);
       setFlagStandIsFlashing(false);
       setFlagStandShowChequered(true);
+      // The traffic lights remain as they are
     } else if (["YELLOW", "YELLOW_FLASH", "RED", "CLEAR"].includes(action)) {
       // These should override both traffic lights and flag stand
       setTrafficLightAction(action);
@@ -220,17 +315,61 @@ function LEDMaster() {
       setFlagStandIsFlashing(action === "YELLOW_FLASH");
       setFlagStandShowChequered(false);
     } else if (action === "GREEN") {
-      // Green does NOT override flag stand if it's showing a flag stand only flag
+      // Green DOES override flag stand
       setTrafficLightAction(action);
       setIsFlashing(false);
       setTrafficLightShowChequered(false);
-      // Only update flag stand if it's not showing a flag stand only flag
-      if (!["WHITE"].includes(flagStandAction)) {
-        setFlagStandAction(action);
-        setFlagStandIsFlashing(false);
-        setFlagStandShowChequered(false);
-      }
+      // Always update flag stand to green
+      setFlagStandAction(action);
+      setFlagStandIsFlashing(false);
+      setFlagStandShowChequered(false);
+      setIsRotatingFlag(false);
     }
+  };
+
+  // Handle custom text submission
+  const handleTextSubmit = () => {
+    if (!customText.trim()) return;
+
+    // Add to last entered texts (keep last 5)
+    setLastEnteredTexts((prev) => {
+      const updated = [
+        customText.trim(),
+        ...prev.filter((t) => t !== customText.trim()),
+      ];
+      return updated.slice(0, 5);
+    });
+
+    // Save the custom text
+    setCurrentCustomText(customText.trim());
+
+    // Set the flag with rotation
+    setFlagStandAction(selectedFlag);
+    setFlagStandIsFlashing(false);
+    setFlagStandShowChequered(false);
+    setIsRotatingFlag(true);
+    setShowFlagInRotation(true);
+
+    // Close modal and reset
+    setShowTextModal(false);
+    setCustomText("");
+  };
+
+  // Handle quick select from last entered
+  const handleQuickSelect = (text) => {
+    // Save the custom text
+    setCurrentCustomText(text);
+
+    // Set the flag with rotation immediately
+    setFlagStandAction(selectedFlag);
+    setFlagStandIsFlashing(false);
+    setFlagStandShowChequered(false);
+    setIsRotatingFlag(true);
+    setShowFlagInRotation(true);
+
+    // Close modal
+    setShowTextModal(false);
+    setCustomText("");
   };
 
   // Handlers for brightness and box size changes
@@ -258,9 +397,18 @@ function LEDMaster() {
     "RED",
     "YELLOW",
     "YELLOW_FLASH",
-    "CHEQUERED",
   ];
-  const flagStandButtons = ["CLEAR_FLAG_STAND", "WHITE", "CHEQUERED"];
+  const flagStandButtons = [
+    "CLEAR_FLAG_STAND",
+    "WHITE",
+    "CHEQUERED",
+    "PASSING",
+    "RULE_INFRINGEMENT",
+    "NOISE_FLAG",
+    "FIRE_FLAG",
+    "MECHANICAL_DEFECT",
+    "BLACK_FLAG",
+  ];
 
   // Combined array for horizontal layout (kept for compatibility)
   const allButtons = [...trafficLightButtons, ...flagStandButtons];
@@ -275,6 +423,12 @@ function LEDMaster() {
     CLEAR_FLAG_STAND: "F6",
     WHITE: "F7",
     CHEQUERED: "F8",
+    PASSING: "F10",
+    RULE_INFRINGEMENT: "F11",
+    NOISE_FLAG: "F12",
+    FIRE_FLAG: "Insert",
+    MECHANICAL_DEFECT: "Delete",
+    BLACK_FLAG: "Home",
   };
 
   // Helper for color
@@ -356,6 +510,18 @@ function LEDMaster() {
               background:
                 flagStandAction === "CHEQUERED" || flagStandShowChequered
                   ? "#222"
+                  : flagStandAction === "PASSING"
+                  ? "#0000FF"
+                  : flagStandAction === "RULE_INFRINGEMENT"
+                  ? "#000"
+                  : flagStandAction === "NOISE_FLAG"
+                  ? "#FFFF00"
+                  : flagStandAction === "FIRE_FLAG"
+                  ? "#FFFF00"
+                  : flagStandAction === "MECHANICAL_DEFECT"
+                  ? "#000"
+                  : flagStandAction === "BLACK_FLAG"
+                  ? "#000"
                   : flagStandAction === "YELLOW_FLASH"
                   ? COLORS.YELLOW
                   : adjustBrightness(
@@ -381,6 +547,385 @@ function LEDMaster() {
                   imageRendering: "pixelated",
                 }}
               />
+            )}
+            {flagStandAction === "PASSING" && (
+              <svg
+                viewBox="0 0 100 100"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  imageRendering: "auto",
+                }}
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <rect width="100" height="100" fill="#0000FF" />
+                <circle cx="50" cy="50" r="25" fill="#FFFF00" />
+              </svg>
+            )}
+            {flagStandAction === "RULE_INFRINGEMENT" && (
+              <>
+                {!isRotatingFlag || showFlagInRotation ? (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#000000" />
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="100"
+                      y2="100"
+                      stroke="#FFFFFF"
+                      strokeWidth="10"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#000000" />
+                    <text
+                      x="50"
+                      y="50"
+                      fontSize={calculateFontSize(
+                        flagStandBoxWidth,
+                        flagStandBoxHeight,
+                        currentCustomText.length
+                      )}
+                      fontWeight="bold"
+                      fill="#FFFFFF"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      {currentCustomText}
+                    </text>
+                  </svg>
+                )}
+              </>
+            )}
+            {flagStandAction === "NOISE_FLAG" && (
+              <>
+                {!isRotatingFlag || showFlagInRotation ? (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#FFFF00" />
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="100"
+                      y2="100"
+                      stroke="#000000"
+                      strokeWidth="10"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#FFFF00" />
+                    <text
+                      x="50"
+                      y="50"
+                      fontSize={calculateFontSize(
+                        flagStandBoxWidth,
+                        flagStandBoxHeight,
+                        currentCustomText.length
+                      )}
+                      fontWeight="bold"
+                      fill="#000000"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      {currentCustomText}
+                    </text>
+                  </svg>
+                )}
+              </>
+            )}
+            {flagStandAction === "FIRE_FLAG" && (
+              <>
+                {!isRotatingFlag || showFlagInRotation ? (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#FFFF00" />
+                    <line
+                      x1="0"
+                      y1="100"
+                      x2="100"
+                      y2="0"
+                      stroke="#FF0000"
+                      strokeWidth="10"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#FFFF00" />
+                    <text
+                      x="50"
+                      y="50"
+                      fontSize={calculateFontSize(
+                        flagStandBoxWidth,
+                        flagStandBoxHeight,
+                        currentCustomText.length
+                      )}
+                      fontWeight="bold"
+                      fill="#FF0000"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      {currentCustomText}
+                    </text>
+                  </svg>
+                )}
+              </>
+            )}
+            {flagStandAction === "MECHANICAL_DEFECT" && (
+              <>
+                {!isRotatingFlag || showFlagInRotation ? (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="xMidYMid meet"
+                  >
+                    <rect width="100" height="100" fill="#000000" />
+                    <circle cx="50" cy="50" r="25" fill="#FFFFFF" />
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#000000" />
+                    <text
+                      x="50"
+                      y="50"
+                      fontSize={calculateFontSize(
+                        flagStandBoxWidth,
+                        flagStandBoxHeight,
+                        currentCustomText.length
+                      )}
+                      fontWeight="bold"
+                      fill="#FFFFFF"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      {currentCustomText}
+                    </text>
+                  </svg>
+                )}
+              </>
+            )}
+            {flagStandAction === "NOISE_FLAG" && (
+              <svg
+                viewBox="0 0 100 100"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  imageRendering: "auto",
+                }}
+                preserveAspectRatio="none"
+              >
+                <rect width="100" height="100" fill="#FFFF00" />
+                <line
+                  x1="0"
+                  y1="100"
+                  x2="100"
+                  y2="0"
+                  stroke="#000000"
+                  strokeWidth="10"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            )}
+            {flagStandAction === "FIRE_FLAG" && (
+              <svg
+                viewBox="0 0 100 100"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  imageRendering: "auto",
+                }}
+                preserveAspectRatio="none"
+              >
+                <rect width="100" height="100" fill="#FFFF00" />
+                <line
+                  x1="0"
+                  y1="100"
+                  x2="100"
+                  y2="0"
+                  stroke="#FF0000"
+                  strokeWidth="10"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+            )}
+            {flagStandAction === "MECHANICAL_DEFECT" && (
+              <svg
+                viewBox="0 0 100 100"
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  imageRendering: "auto",
+                }}
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <rect width="100" height="100" fill="#000000" />
+                <circle cx="50" cy="50" r="25" fill="#FFFFFF" />
+              </svg>
+            )}
+            {flagStandAction === "BLACK_FLAG" && (
+              <>
+                {!isRotatingFlag || showFlagInRotation ? (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#000000" />
+                    <text
+                      x="50"
+                      y="35"
+                      fontSize="16"
+                      fontWeight="bold"
+                      fill="#FFFFFF"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      BLACK
+                    </text>
+                    <text
+                      x="50"
+                      y="65"
+                      fontSize="16"
+                      fontWeight="bold"
+                      fill="#FFFFFF"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      FLAG
+                    </text>
+                  </svg>
+                ) : (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      imageRendering: "auto",
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#000000" />
+                    <text
+                      x="50"
+                      y="50"
+                      fontSize={calculateFontSize(
+                        flagStandBoxWidth,
+                        flagStandBoxHeight,
+                        currentCustomText.length
+                      )}
+                      fontWeight="bold"
+                      fill="#FFFFFF"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      {currentCustomText}
+                    </text>
+                  </svg>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -451,28 +996,236 @@ function LEDMaster() {
                 key={action}
                 className={
                   action === "CHEQUERED"
-                    ? "bg-gray-400 hover:bg-gray-300 text-black text-lg flex items-center justify-center"
+                    ? "hover:bg-gray-700 text-white text-lg flex items-center justify-center"
                     : action === "WHITE"
                     ? "bg-white hover:bg-gray-200 text-black text-lg flex items-center justify-center"
+                    : action === "PASSING"
+                    ? "hover:bg-gray-700 text-white text-lg flex items-center justify-center"
+                    : action === "RULE_INFRINGEMENT"
+                    ? "hover:bg-gray-700 text-white text-lg flex items-center justify-center"
+                    : action === "NOISE_FLAG"
+                    ? "hover:bg-gray-700 text-black text-lg flex items-center justify-center"
+                    : action === "FIRE_FLAG"
+                    ? "hover:bg-gray-700 text-black text-lg flex items-center justify-center"
+                    : action === "MECHANICAL_DEFECT"
+                    ? "hover:bg-gray-700 text-white text-lg flex items-center justify-center"
+                    : action === "BLACK_FLAG"
+                    ? "hover:bg-gray-700 text-white text-lg flex items-center justify-center"
                     : action === "CLEAR_FLAG_STAND"
                     ? "bg-gray-700 hover:bg-gray-600 text-white text-lg flex items-center justify-center"
                     : ""
                 }
                 style={{
                   borderRadius: 0,
-                  width: "calc(50% - 6px)", // Half width minus gap
-                  height: "96px", // Double the current 48px height
-                  minWidth: "140px", // Minimum width for readability
-                  maxWidth: "200px", // Maximum width to prevent overly wide buttons
+                  width: "calc(50% - 6px)",
+                  height: "96px",
+                  minWidth: "140px",
+                  maxWidth: "200px",
+                  position: "relative",
+                  overflow: "hidden",
+                  background:
+                    action === "CHEQUERED"
+                      ? "#222"
+                      : action === "PASSING"
+                      ? "#0000FF"
+                      : action === "RULE_INFRINGEMENT"
+                      ? "#000"
+                      : action === "NOISE_FLAG"
+                      ? "#FFFF00"
+                      : action === "FIRE_FLAG"
+                      ? "#FFFF00"
+                      : action === "MECHANICAL_DEFECT"
+                      ? "#000"
+                      : action === "BLACK_FLAG"
+                      ? "#000"
+                      : undefined,
                 }}
                 onClick={() => handleButton(action)}
               >
-                <div className="flex flex-col items-center">
+                {action === "CHEQUERED" && (
+                  <img
+                    src="/chequered.gif"
+                    alt="Chequered"
+                    style={{
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      imageRendering: "pixelated",
+                      opacity: 0.6,
+                    }}
+                  />
+                )}
+                {action === "PASSING" && (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      top: 0,
+                      left: 0,
+                      opacity: 0.7,
+                    }}
+                    preserveAspectRatio="xMidYMid meet"
+                  >
+                    <rect width="100" height="100" fill="#0000FF" />
+                    <circle cx="50" cy="50" r="25" fill="#FFFF00" />
+                  </svg>
+                )}
+                {action === "RULE_INFRINGEMENT" && (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      top: 0,
+                      left: 0,
+                      opacity: 0.7,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#000000" />
+                    <line
+                      x1="0"
+                      y1="100"
+                      x2="100"
+                      y2="0"
+                      stroke="#FFFFFF"
+                      strokeWidth="10"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                )}
+                {action === "NOISE_FLAG" && (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      top: 0,
+                      left: 0,
+                      opacity: 0.7,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#FFFF00" />
+                    <line
+                      x1="0"
+                      y1="100"
+                      x2="100"
+                      y2="0"
+                      stroke="#000000"
+                      strokeWidth="10"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                )}
+                {action === "FIRE_FLAG" && (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      top: 0,
+                      left: 0,
+                      opacity: 0.7,
+                    }}
+                    preserveAspectRatio="none"
+                  >
+                    <rect width="100" height="100" fill="#FFFF00" />
+                    <line
+                      x1="0"
+                      y1="100"
+                      x2="100"
+                      y2="0"
+                      stroke="#FF0000"
+                      strokeWidth="10"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  </svg>
+                )}
+                {action === "MECHANICAL_DEFECT" && (
+                  <svg
+                    viewBox="0 0 100 100"
+                    style={{
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      top: 0,
+                      left: 0,
+                      opacity: 0.7,
+                    }}
+                    preserveAspectRatio="xMidYMid meet"
+                  >
+                    <rect width="100" height="100" fill="#000000" />
+                    <circle cx="50" cy="50" r="25" fill="#FFFFFF" />
+                  </svg>
+                )}
+                {action === "BLACK_FLAG" && (
+                  <svg
+                    viewBox="0 0 200 100"
+                    style={{
+                      position: "absolute",
+                      width: "100%",
+                      height: "100%",
+                      top: 0,
+                      left: 0,
+                      opacity: 0.7,
+                    }}
+                    preserveAspectRatio="xMidYMid meet"
+                  >
+                    <rect width="200" height="100" fill="#000000" />
+                    <text
+                      x="100"
+                      y="35"
+                      fontSize="32"
+                      fontWeight="bold"
+                      fill="#FFFFFF"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      BLACK
+                    </text>
+                    <text
+                      x="100"
+                      y="65"
+                      fontSize="32"
+                      fontWeight="bold"
+                      fill="#FFFFFF"
+                      textAnchor="middle"
+                      dominantBaseline="middle"
+                      fontFamily="Arial, sans-serif"
+                    >
+                      FLAG
+                    </text>
+                  </svg>
+                )}
+                <div
+                  className="flex flex-col items-center"
+                  style={{ position: "relative", zIndex: 1 }}
+                >
                   <span className="text-xl font-bold">
                     {action === "CHEQUERED"
                       ? "Chequered"
                       : action === "CLEAR_FLAG_STAND"
                       ? "Clear Flag Stand"
+                      : action === "PASSING"
+                      ? "Passing Flag"
+                      : action === "RULE_INFRINGEMENT"
+                      ? "Rule Infringement"
+                      : action === "NOISE_FLAG"
+                      ? "Noise Flag"
+                      : action === "FIRE_FLAG"
+                      ? "Fire Flag"
+                      : action === "MECHANICAL_DEFECT"
+                      ? "Mechanical Defect"
+                      : action === "BLACK_FLAG"
+                      ? "Black Flag"
                       : action.charAt(0) + action.slice(1).toLowerCase()}
                   </span>
                   <span className="text-xs mt-1 opacity-75">
@@ -667,6 +1420,94 @@ function LEDMaster() {
                   Close (ESC/F9)
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Custom Text Modal */}
+      {showTextModal && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          onClick={() => setShowTextModal(false)}
+        >
+          <div
+            className="bg-gray-800 p-6 max-w-md w-full"
+            onClick={(e) => e.stopPropagation()}
+            style={{ borderRadius: 0 }}
+          >
+            <h2 className="text-white text-2xl font-bold mb-4">
+              Enter Text for{" "}
+              {selectedFlag === "RULE_INFRINGEMENT"
+                ? "Rule Infringement"
+                : selectedFlag === "NOISE_FLAG"
+                ? "Noise Flag"
+                : selectedFlag === "FIRE_FLAG"
+                ? "Fire Flag"
+                : selectedFlag === "BLACK_FLAG"
+                ? "Black Flag"
+                : selectedFlag === "MECHANICAL_DEFECT"
+                ? "Mechanical Defect"
+                : "Flag"}
+            </h2>
+
+            {/* Input field */}
+            <div className="mb-4">
+              <input
+                type="text"
+                value={customText}
+                onChange={(e) => setCustomText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    handleTextSubmit();
+                  }
+                }}
+                placeholder="e.g., V60"
+                className="w-full bg-gray-700 text-white text-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                style={{ borderRadius: 0 }}
+                autoFocus
+              />
+            </div>
+
+            {/* Last Entered Section */}
+            {lastEnteredTexts.length > 0 && (
+              <div className="mb-4">
+                <h3 className="text-white text-sm font-semibold mb-2">
+                  Last Entered (Quick Select):
+                </h3>
+                <div className="flex flex-wrap gap-2">
+                  {lastEnteredTexts.map((text, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleQuickSelect(text)}
+                      className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 text-lg font-bold"
+                      style={{ borderRadius: 0 }}
+                    >
+                      {text}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <button
+                onClick={handleTextSubmit}
+                className="flex-1 bg-green-600 hover:bg-green-500 text-white px-6 py-3 text-lg font-bold"
+                style={{ borderRadius: 0 }}
+              >
+                Submit
+              </button>
+              <button
+                onClick={() => {
+                  setShowTextModal(false);
+                  setCustomText("");
+                }}
+                className="flex-1 bg-gray-600 hover:bg-gray-500 text-white px-6 py-3 text-lg font-bold"
+                style={{ borderRadius: 0 }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
         </div>
