@@ -47,7 +47,7 @@ function calculateFontSize(boxWidth, boxHeight, textLength) {
   const minDimension = Math.min(boxWidth, boxHeight);
   // Base size is reduced to fit better on x-axis
   let baseFontSize = 50; // Reduced from 80
-  
+
   // Adjust based on text length
   if (textLength > 2) {
     baseFontSize = 40;
@@ -61,9 +61,10 @@ function calculateFontSize(boxWidth, boxHeight, textLength) {
   if (textLength > 8) {
     baseFontSize = 18;
   }
-  
+
   return baseFontSize;
-}function LEDMaster() {
+}
+function LEDMaster() {
   // State for both statuses
   const [trafficLightAction, setTrafficLightAction] = useState("CLEAR");
   const [flagStandAction, setFlagStandAction] = useState("CLEAR");
@@ -580,9 +581,9 @@ function calculateFontSize(boxWidth, boxHeight, textLength) {
                     <rect width="100" height="100" fill="#000000" />
                     <line
                       x1="0"
-                      y1="0"
+                      y1="100"
                       x2="100"
-                      y2="100"
+                      y2="0"
                       stroke="#FFFFFF"
                       strokeWidth="10"
                       vectorEffect="non-scaling-stroke"
@@ -640,9 +641,9 @@ function calculateFontSize(boxWidth, boxHeight, textLength) {
                     <rect width="100" height="100" fill="#FFFF00" />
                     <line
                       x1="0"
-                      y1="0"
+                      y1="100"
                       x2="100"
-                      y2="100"
+                      y2="0"
                       stroke="#000000"
                       strokeWidth="10"
                       vectorEffect="non-scaling-stroke"
@@ -700,9 +701,9 @@ function calculateFontSize(boxWidth, boxHeight, textLength) {
                     <rect width="100" height="100" fill="#FFFF00" />
                     <line
                       x1="0"
-                      y1="100"
+                      y1="0"
                       x2="100"
-                      y2="0"
+                      y2="100"
                       stroke="#FF0000"
                       strokeWidth="10"
                       vectorEffect="non-scaling-stroke"
