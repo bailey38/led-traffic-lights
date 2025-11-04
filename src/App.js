@@ -700,9 +700,9 @@ function LEDMaster() {
                   >
                     <rect width="100" height="100" fill="#FFFF00" />
                     <line
-                      x1="0"
+                      x1="100"
                       y1="0"
-                      x2="100"
+                      x2="0"
                       y2="100"
                       stroke="#FF0000"
                       strokeWidth="10"
