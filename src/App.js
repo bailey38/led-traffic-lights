@@ -330,7 +330,18 @@ function LEDMaster() {
 
   // Handle custom text submission
   const handleTextSubmit = () => {
-    if (!customText.trim()) return;
+    // If no text entered, just show the flag without rotation
+    if (!customText.trim()) {
+      setFlagStandAction(selectedFlag);
+      setFlagStandIsFlashing(false);
+      setFlagStandShowChequered(false);
+      setIsRotatingFlag(false);
+      
+      // Close modal and reset
+      setShowTextModal(false);
+      setCustomText("");
+      return;
+    }
 
     // Add to last entered texts (keep last 5)
     setLastEnteredTexts((prev) => {
@@ -1472,15 +1483,24 @@ function LEDMaster() {
             {/* Last Entered Section */}
             {lastEnteredTexts.length > 0 && (
               <div className="mb-4">
-                <h3 className="text-white text-sm font-semibold mb-2">
-                  Last Entered (Quick Select):
-                </h3>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex justify-between items-center mb-2">
+                  <h3 className="text-white text-sm font-semibold">
+                    Last Entered (Quick Select):
+                  </h3>
+                  <button
+                    onClick={() => setLastEnteredTexts([])}
+                    className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 text-xs font-bold"
+                    style={{ borderRadius: 0 }}
+                  >
+                    Reset
+                  </button>
+                </div>
+                <div className="flex flex-col gap-2">
                   {lastEnteredTexts.map((text, index) => (
                     <button
                       key={index}
                       onClick={() => handleQuickSelect(text)}
-                      className="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 text-lg font-bold"
+                      className="w-full bg-gray-700 hover:bg-gray-600 text-white px-4 py-3 text-xl font-bold"
                       style={{ borderRadius: 0 }}
                     >
                       {text}
