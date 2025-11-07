@@ -7,6 +7,7 @@ const COLORS = {
   GREEN: "#66ff00",
   YELLOW: "#FFFF00",
   YELLOW_FLASH: "#FFFF00",
+  YELLOW_AMBER: "#ffbf00",
   WHITE: "#FFFFFF",
   CHEQUERED: null,
 };
@@ -64,6 +65,7 @@ function calculateFontSize(boxWidth, boxHeight, textLength) {
 
   return baseFontSize;
 }
+
 function LEDMaster() {
   // State for both statuses
   const [trafficLightAction, setTrafficLightAction] = useState("CLEAR");
@@ -94,6 +96,7 @@ function LEDMaster() {
   const [pendingFlagStandBoxHeight, setPendingFlagStandBoxHeight] =
     useState(80);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [useAmberYellow, setUseAmberYellow] = useState(false);
 
   // Custom text modal states
   const [showTextModal, setShowTextModal] = useState(false);
@@ -487,7 +490,9 @@ function LEDMaster() {
                 trafficLightAction === "CHEQUERED" || trafficLightShowChequered
                   ? "#222"
                   : trafficLightAction === "YELLOW_FLASH"
-                  ? COLORS.YELLOW
+                  ? useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW
+                  : trafficLightAction === "YELLOW"
+                  ? useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW
                   : adjustBrightness(
                       COLORS[trafficLightAction] || "#000",
                       brightness
@@ -527,15 +532,17 @@ function LEDMaster() {
                   : flagStandAction === "RULE_INFRINGEMENT"
                   ? "#000"
                   : flagStandAction === "NOISE_FLAG"
-                  ? "#FFFF00"
+                  ? useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW
                   : flagStandAction === "FIRE_FLAG"
-                  ? "#FFFF00"
+                  ? useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW
                   : flagStandAction === "MECHANICAL_DEFECT"
                   ? "#000"
                   : flagStandAction === "BLACK_FLAG"
                   ? "#000"
                   : flagStandAction === "YELLOW_FLASH"
-                  ? COLORS.YELLOW
+                  ? useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW
+                  : flagStandAction === "YELLOW"
+                  ? useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW
                   : adjustBrightness(
                       COLORS[flagStandAction] || "#000",
                       flagStandBrightness
@@ -649,7 +656,7 @@ function LEDMaster() {
                     }}
                     preserveAspectRatio="none"
                   >
-                    <rect width="100" height="100" fill="#FFFF00" />
+                    <rect width="100" height="100" fill={useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW} />
                     <line
                       x1="0"
                       y1="100"
@@ -673,7 +680,7 @@ function LEDMaster() {
                     }}
                     preserveAspectRatio="none"
                   >
-                    <rect width="100" height="100" fill="#FFFF00" />
+                    <rect width="100" height="100" fill={useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW} />
                     <text
                       x="50"
                       y="50"
@@ -709,7 +716,7 @@ function LEDMaster() {
                     }}
                     preserveAspectRatio="none"
                   >
-                    <rect width="100" height="100" fill="#FFFF00" />
+                    <rect width="100" height="100" fill={useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW} />
                     <line
                       x1="100"
                       y1="0"
@@ -733,7 +740,7 @@ function LEDMaster() {
                     }}
                     preserveAspectRatio="none"
                   >
-                    <rect width="100" height="100" fill="#FFFF00" />
+                    <rect width="100" height="100" fill={useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW} />
                     <text
                       x="50"
                       y="50"
@@ -1043,9 +1050,9 @@ function LEDMaster() {
                       : action === "RULE_INFRINGEMENT"
                       ? "#000"
                       : action === "NOISE_FLAG"
-                      ? "#FFFF00"
+                      ? useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW
                       : action === "FIRE_FLAG"
-                      ? "#FFFF00"
+                      ? useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW
                       : action === "MECHANICAL_DEFECT"
                       ? "#000"
                       : action === "BLACK_FLAG"
@@ -1123,7 +1130,7 @@ function LEDMaster() {
                     }}
                     preserveAspectRatio="none"
                   >
-                    <rect width="100" height="100" fill="#FFFF00" />
+                    <rect width="100" height="100" fill={useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW} />
                     <line
                       x1="0"
                       y1="100"
@@ -1148,7 +1155,7 @@ function LEDMaster() {
                     }}
                     preserveAspectRatio="none"
                   >
-                    <rect width="100" height="100" fill="#FFFF00" />
+                    <rect width="100" height="100" fill={useAmberYellow ? COLORS.YELLOW_AMBER : COLORS.YELLOW} />
                     <line
                       x1="0"
                       y1="100"
@@ -1367,6 +1374,32 @@ function LEDMaster() {
                     <span>Brightness</span>
                     <span className="text-gray-400">{brightness}%</span>
                   </div>
+                </div>
+              </div>
+
+              {/* Yellow Color Toggle */}
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-gray-300">
+                  Yellow Color
+                </h3>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-300">
+                    Use Amber Yellow (#ffbf00)
+                  </span>
+                  <button
+                    onClick={() => setUseAmberYellow(!useAmberYellow)}
+                    className={`px-4 py-2 font-bold text-sm ${
+                      useAmberYellow
+                        ? "bg-green-600 hover:bg-green-500"
+                        : "bg-gray-600 hover:bg-gray-500"
+                    } text-white transition-colors`}
+                    style={{ borderRadius: 0 }}
+                  >
+                    {useAmberYellow ? "ON" : "OFF"}
+                  </button>
+                </div>
+                <div className="text-xs text-gray-400 mt-1">
+                  Affects: Yellow, Yellow Flashing, Noise Flag, and Fire Flag
                 </div>
               </div>
 
