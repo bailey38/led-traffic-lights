@@ -77,8 +77,6 @@ function LEDMaster() {
   const [trafficLightShowChequered, setTrafficLightShowChequered] =
     useState(false);
   const [flagStandShowChequered, setFlagStandShowChequered] = useState(false);
-  const [boxWidth, setBoxWidth] = useState(40);
-  const [boxHeight, setBoxHeight] = useState(80);
   const [trafficLightBoxWidth, setTrafficLightBoxWidth] = useState(80);
   const [trafficLightBoxHeight, setTrafficLightBoxHeight] = useState(40);
   const [flagStandBoxWidth, setFlagStandBoxWidth] = useState(80);
@@ -101,8 +99,6 @@ function LEDMaster() {
     flagStandAction,
     brightness,
     flagStandBrightness,
-    boxWidth,
-    boxHeight,
   };
 
   // Flashing effect for yellow (traffic light)
