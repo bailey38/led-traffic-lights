@@ -44,7 +44,6 @@ function adjustBrightness(hex, brightness) {
 
 // Calculate font size based on box dimensions and text length
 function calculateFontSize(boxWidth, boxHeight, textLength) {
-  const minDimension = Math.min(boxWidth, boxHeight);
   // Base size is reduced to fit better on x-axis
   let baseFontSize = 50; // Reduced from 80
 
@@ -73,10 +72,8 @@ function LEDMaster() {
   const [flagStandIsFlashing, setFlagStandIsFlashing] = useState(false);
 
   const [brightness, setBrightness] = useState(100);
-  const [prevBrightness, setPrevBrightness] = useState(100);
   const [flagStandBrightness, setFlagStandBrightness] = useState(100);
   const [flagStandPrevBrightness, setFlagStandPrevBrightness] = useState(100);
-  const [showChequered, setShowChequered] = useState(false);
   const [trafficLightShowChequered, setTrafficLightShowChequered] =
     useState(false);
   const [flagStandShowChequered, setFlagStandShowChequered] = useState(false);
@@ -86,14 +83,6 @@ function LEDMaster() {
   const [trafficLightBoxHeight, setTrafficLightBoxHeight] = useState(40);
   const [flagStandBoxWidth, setFlagStandBoxWidth] = useState(80);
   const [flagStandBoxHeight, setFlagStandBoxHeight] = useState(80);
-  const [pendingTrafficLightBoxWidth, setPendingTrafficLightBoxWidth] =
-    useState(trafficLightBoxWidth);
-  const [pendingTrafficLightBoxHeight, setPendingTrafficLightBoxHeight] =
-    useState(trafficLightBoxHeight);
-  const [pendingFlagStandBoxWidth, setPendingFlagStandBoxWidth] =
-    useState(flagStandBoxWidth);
-  const [pendingFlagStandBoxHeight, setPendingFlagStandBoxHeight] =
-    useState(80);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
   // Custom text modal states
@@ -390,18 +379,6 @@ function LEDMaster() {
     setBrightness(val);
     setFlagStandBrightness(val);
   };
-  const handleBoxWidthChange = (val) => {
-    setBoxWidth(val);
-  };
-  const handleBoxHeightChange = (val) => {
-    setBoxHeight(val);
-  };
-  const handleFlagStandBoxWidthChange = (val) => {
-    setFlagStandBoxWidth(val);
-  };
-  const handleFlagStandBoxHeightChange = (val) => {
-    setFlagStandBoxHeight(val);
-  };
 
   // Split buttons into traffic lights and flag stand
   const trafficLightButtons = [
@@ -423,9 +400,6 @@ function LEDMaster() {
     "BLACK_FLAG",
   ];
 
-  // Combined array for horizontal layout (kept for compatibility)
-  const allButtons = [...trafficLightButtons, ...flagStandButtons];
-
   // Keybind mappings
   const keybindMap = {
     CLEAR: "F1",
@@ -443,20 +417,6 @@ function LEDMaster() {
     MECHANICAL_DEFECT: "Delete",
     BLACK_FLAG: "Home",
   };
-
-  // Helper for color
-  const getColor = (action) =>
-    action === "RED"
-      ? "#FF0000"
-      : action === "GREEN"
-      ? "#00FF00"
-      : action === "YELLOW" || action === "YELLOW_FLASH"
-      ? "#FFD600"
-      : action === "WHITE"
-      ? "#FFFFFF"
-      : action === "CHEQUERED"
-      ? "#888"
-      : "#AAA";
 
   return (
     <div
