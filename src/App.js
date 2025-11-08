@@ -532,7 +532,7 @@ function LEDMaster() {
                 preserveAspectRatio="xMidYMid meet"
               >
                 <rect width="100" height="100" fill="#0000FF" />
-                <circle cx="50" cy="50" r="25" fill="#FFFF00" />
+                <circle cx="50" cy="50" r="25" fill="#ffbf00" />
               </svg>
             )}
             {flagStandAction === "RULE_INFRINGEMENT" && (
@@ -1043,7 +1043,7 @@ function LEDMaster() {
                     preserveAspectRatio="xMidYMid meet"
                   >
                     <rect width="100" height="100" fill="#0000FF" />
-                    <circle cx="50" cy="50" r="25" fill="#FFFF00" />
+                    <circle cx="50" cy="50" r="25" fill="#ffbf00" />
                   </svg>
                 )}
                 {action === "RULE_INFRINGEMENT" && (
