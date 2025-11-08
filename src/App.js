@@ -1400,7 +1400,7 @@ function LEDMaster() {
       {/* Custom Text Modal */}
       {showTextModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 flex items-center justify-center z-50"
           onClick={() => setShowTextModal(false)}
         >
           <div
@@ -1428,7 +1428,7 @@ function LEDMaster() {
               <input
                 type="text"
                 value={customText}
-                onChange={(e) => setCustomText(e.target.value)}
+                onChange={(e) => setCustomText(e.target.value.toUpperCase())}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleTextSubmit();
@@ -1436,7 +1436,7 @@ function LEDMaster() {
                 }}
                 placeholder="e.g., V60"
                 className="w-full bg-gray-700 text-white text-2xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                style={{ borderRadius: 0 }}
+                style={{ borderRadius: 0, textTransform: "uppercase" }}
                 autoFocus
               />
             </div>
