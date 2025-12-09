@@ -83,6 +83,16 @@ function LEDMaster() {
   const [flagStandBoxHeight, setFlagStandBoxHeight] = useState(80);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
 
+  // RMonitor connection state
+  const [rmonitorConnected, setRmonitorConnected] = useState(false);
+  const [rmonitorHost, setRmonitorHost] = useState("127.0.0.1");
+  const [rmonitorPort, setRmonitorPort] = useState("50000");
+  const [rmonitorError, setRmonitorError] = useState(null);
+  const [lapData, setLapData] = useState({});
+  const [raceStatus, setRaceStatus] = useState(null);
+  const [showLapCounterAlways, setShowLapCounterAlways] = useState(false);
+  const wsRef = useRef(null);
+
   // Custom text modal states
   const [showTextModal, setShowTextModal] = useState(false);
   const [selectedFlag, setSelectedFlag] = useState("");
@@ -135,6 +145,76 @@ function LEDMaster() {
     }
     return () => clearInterval(interval);
   }, [isRotatingFlag]);
+
+  // RMonitor WebSocket connection
+  useEffect(() => {
+    const connectWebSocket = () => {
+      const ws = new WebSocket("ws://localhost:8080");
+
+      ws.onopen = () => {
+        console.log("Connected to RMonitor server");
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+
+          switch (data.type) {
+            case "CONNECTION_STATUS":
+              setRmonitorConnected(data.connected);
+              if (data.host) setRmonitorHost(data.host);
+              if (data.port) setRmonitorPort(data.port.toString());
+              if (data.error) {
+                setRmonitorError(data.error);
+              } else {
+                setRmonitorError(null);
+              }
+              break;
+
+            case "PASSING":
+              if (data.allLaps) {
+                setLapData(data.allLaps);
+              }
+              break;
+
+            case "RACE_STATUS":
+              setRaceStatus(data);
+              break;
+
+            case "RACE_INFO":
+              console.log("Race info:", data);
+              break;
+
+            default:
+              break;
+          }
+        } catch (error) {
+          console.error("Error parsing WebSocket message:", error);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+      };
+
+      ws.onclose = () => {
+        console.log("Disconnected from RMonitor server");
+        setRmonitorConnected(false);
+        // Attempt to reconnect after 3 seconds
+        setTimeout(connectWebSocket, 3000);
+      };
+
+      wsRef.current = ws;
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close();
+      }
+    };
+  }, []);
 
   // Listen for keydown events
   useEffect(() => {
@@ -374,6 +454,32 @@ function LEDMaster() {
   const handleBrightnessChange = (val) => {
     setBrightness(val);
     setFlagStandBrightness(val);
+  };
+
+  // RMonitor connection handlers
+  const handleRMonitorConnect = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      setRmonitorError(null);
+      wsRef.current.send(
+        JSON.stringify({
+          type: "CONNECT",
+          host: rmonitorHost,
+          port: parseInt(rmonitorPort),
+        })
+      );
+    }
+  };
+
+  const handleRMonitorDisconnect = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "DISCONNECT",
+        })
+      );
+      setLapData({});
+      setRaceStatus(null);
+    }
   };
 
   // Split buttons into traffic lights and flag stand
@@ -902,6 +1008,53 @@ function LEDMaster() {
             )}
           </div>
         </div>
+
+        {/* Lap Counter - Bottom Right */}
+        {(showLapCounterAlways || raceStatus?.totalLaps) && (
+          <div className="absolute bottom-4 right-4 pointer-events-none z-10">
+            <div className="bg-white px-4 py-2">
+              <div className="text-black text-lg font-bold font-mono">
+                Laps: {raceStatus?.totalLaps || 0}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Lap Data Display - Bottom Center */}
+        {Object.keys(lapData).length > 0 && (
+          <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
+            <div className="bg-gray-900 bg-opacity-90 border border-gray-700 rounded px-4 py-2">
+              <div className="text-white text-sm space-y-1">
+                {Object.entries(lapData)
+                  .sort(
+                    (a, b) => (a[1].position || 999) - (b[1].position || 999)
+                  )
+                  .slice(0, 10)
+                  .map(([carNumber, data]) => (
+                    <div
+                      key={carNumber}
+                      className="flex gap-4 items-center font-mono"
+                    >
+                      <span className="text-gray-400 w-8">
+                        P{data.position}
+                      </span>
+                      <span className="text-white font-bold w-12">
+                        #{data.number}
+                      </span>
+                      <span className="text-green-400 w-16">
+                        Lap {data.laps}
+                      </span>
+                      {data.lastTime && (
+                        <span className="text-gray-500 text-xs">
+                          {data.lastTime}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
       </div>{" "}
       {/* Button Area - starts below the 320px reserved area */}
       <div
@@ -1215,168 +1368,246 @@ function LEDMaster() {
       {/* Settings Modal */}
       {showSettingsModal && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+          className="fixed inset-0 flex items-center justify-center z-50 p-4"
           onClick={() => setShowSettingsModal(false)}
         >
           <div
-            className="bg-gray-800 p-8 rounded max-w-lg w-full mx-4"
+            className="bg-gray-800 p-6 rounded max-w-5xl w-full max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-white">
+            <div className="flex justify-center items-center mb-4 sticky top-0 bg-gray-800 pb-2 z-10 relative">
+              <h2 className="text-xl font-bold text-white">
                 Settings & Controls
               </h2>
               <button
                 onClick={() => setShowSettingsModal(false)}
-                className="text-gray-400 hover:text-white text-2xl"
+                className="text-gray-400 hover:text-white text-2xl absolute right-0"
               >
                 ×
               </button>
             </div>
 
-            <div className="space-y-6">
-              {/* Traffic Light Box Size */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-gray-300">
-                  Traffic Lights Size
-                </h3>
-                <div className="flex gap-4">
-                  <label className="flex flex-col items-center text-sm text-gray-300">
-                    Width
-                    <input
-                      type="number"
-                      min={1}
-                      max={320}
-                      value={trafficLightBoxWidth}
-                      onChange={(e) => {
-                        const newWidth = Number(e.target.value);
-                        setTrafficLightBoxWidth(newWidth);
-                      }}
-                      className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </label>
-                  <label className="flex flex-col items-center text-sm text-gray-300">
-                    Height
-                    <input
-                      type="number"
-                      min={1}
-                      max={320}
-                      value={trafficLightBoxHeight}
-                      onChange={(e) => {
-                        const newHeight = Number(e.target.value);
-                        setTrafficLightBoxHeight(newHeight);
-                      }}
-                      className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </label>
+            <div className="grid grid-cols-1 md:grid-cols-[1fr_1px_1fr] gap-6">
+              {/* Left Column */}
+              <div className="space-y-4 flex flex-col items-center">
+                {/* Traffic Light Box Size */}
+                <div className="space-y-2 w-full max-w-md">
+                  <h3 className="text-base font-semibold text-gray-300 text-center">
+                    Traffic Lights Size
+                  </h3>
+                  <div className="flex gap-4 justify-center">
+                    <label className="flex flex-col items-center text-sm text-gray-300">
+                      Width
+                      <input
+                        type="number"
+                        min={1}
+                        max={320}
+                        value={trafficLightBoxWidth}
+                        onChange={(e) => {
+                          const newWidth = Number(e.target.value);
+                          setTrafficLightBoxWidth(newWidth);
+                        }}
+                        className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </label>
+                    <label className="flex flex-col items-center text-sm text-gray-300">
+                      Height
+                      <input
+                        type="number"
+                        min={1}
+                        max={320}
+                        value={trafficLightBoxHeight}
+                        onChange={(e) => {
+                          const newHeight = Number(e.target.value);
+                          setTrafficLightBoxHeight(newHeight);
+                        }}
+                        className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </label>
+                  </div>
                 </div>
-              </div>
 
-              {/* Flag Stand Box Size */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-gray-300">
-                  Flag Stand Size
-                </h3>
-                <div className="flex gap-4">
-                  <label className="flex flex-col items-center text-sm text-gray-300">
-                    Width
-                    <input
-                      type="number"
-                      min={1}
-                      max={320}
-                      value={flagStandBoxWidth}
-                      onChange={(e) => {
-                        const newWidth = Number(e.target.value);
-                        setFlagStandBoxWidth(newWidth);
-                      }}
-                      className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </label>
-                  <label className="flex flex-col items-center text-sm text-gray-300">
-                    Height
-                    <input
-                      type="number"
-                      min={1}
-                      max={320}
-                      value={flagStandBoxHeight}
-                      onChange={(e) => {
-                        const newHeight = Number(e.target.value);
-                        setFlagStandBoxHeight(newHeight);
-                      }}
-                      className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </label>
+                {/* Flag Stand Box Size */}
+                <div className="space-y-2 w-full max-w-md">
+                  <h3 className="text-base font-semibold text-gray-300 text-center">
+                    Flag Stand Size
+                  </h3>
+                  <div className="flex gap-4 justify-center">
+                    <label className="flex flex-col items-center text-sm text-gray-300">
+                      Width
+                      <input
+                        type="number"
+                        min={1}
+                        max={320}
+                        value={flagStandBoxWidth}
+                        onChange={(e) => {
+                          const newWidth = Number(e.target.value);
+                          setFlagStandBoxWidth(newWidth);
+                        }}
+                        className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </label>
+                    <label className="flex flex-col items-center text-sm text-gray-300">
+                      Height
+                      <input
+                        type="number"
+                        min={1}
+                        max={320}
+                        value={flagStandBoxHeight}
+                        onChange={(e) => {
+                          const newHeight = Number(e.target.value);
+                          setFlagStandBoxHeight(newHeight);
+                        }}
+                        className="mt-1 w-20 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </label>
+                  </div>
                 </div>
-              </div>
 
-              {/* Brightness Control */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-gray-300">
-                  Brightness
-                </h3>
-                <div className="flex flex-col space-y-2">
-                  <input
-                    type="range"
-                    min={1}
-                    max={100}
-                    step={1}
-                    value={brightness}
-                    onChange={(e) =>
-                      handleBrightnessChange(Number(e.target.value))
-                    }
-                    className="appearance-none w-full h-4 bg-gray-700 rounded-lg outline-none"
-                  />
-                  <div className="flex justify-between text-sm text-gray-300">
-                    <span>Brightness</span>
-                    <span className="text-gray-400">{brightness}%</span>
+                {/* Brightness Control */}
+                <div className="space-y-2 w-full max-w-md">
+                  <h3 className="text-base font-semibold text-gray-300 text-center">
+                    Brightness
+                  </h3>
+                  <div className="flex flex-col space-y-2">
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      step={1}
+                      value={brightness}
+                      onChange={(e) =>
+                        handleBrightnessChange(Number(e.target.value))
+                      }
+                      className="appearance-none w-full h-4 bg-gray-700 rounded-lg outline-none"
+                    />
+                    <div className="flex justify-between text-sm text-gray-300">
+                      <span>Brightness</span>
+                      <span className="text-gray-400">{brightness}%</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Keybinds Section */}
-              <div className="space-y-2">
-                <h3 className="text-lg font-semibold text-gray-300">
-                  Keybinds
-                </h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="space-y-1">
+              {/* Divider */}
+              <div className="hidden md:block bg-gray-700"></div>
+
+              {/* Right Column */}
+              <div className="space-y-4 flex flex-col items-center">
+                {/* RMonitor Connection */}
+                <div className="space-y-2 w-full max-w-md">
+                  <h3 className="text-base font-semibold text-gray-300 text-center">
+                    RMonitor Connection
+                  </h3>
+                  <div className="flex gap-2 items-end">
+                    <label className="flex flex-col flex-1 text-sm text-gray-300">
+                      IP Address
+                      <input
+                        type="text"
+                        value={rmonitorHost}
+                        onChange={(e) => setRmonitorHost(e.target.value)}
+                        disabled={rmonitorConnected}
+                        className="mt-1 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      />
+                    </label>
+                    <label className="flex flex-col w-24 text-sm text-gray-300">
+                      Port
+                      <input
+                        type="number"
+                        value={rmonitorPort}
+                        onChange={(e) => setRmonitorPort(e.target.value)}
+                        disabled={rmonitorConnected}
+                        className="mt-1 px-2 py-1 rounded bg-gray-700 text-white border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
+                      />
+                    </label>
+                  </div>
+                  <div className="flex gap-2 flex-wrap justify-center">
+                    {!rmonitorConnected ? (
+                      <button
+                        onClick={handleRMonitorConnect}
+                        className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded text-sm"
+                      >
+                        Connect
+                      </button>
+                    ) : (
+                      <button
+                        onClick={handleRMonitorDisconnect}
+                        className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded text-sm"
+                      >
+                        Disconnect
+                      </button>
+                    )}
+                    <span
+                      className={`px-3 py-2 rounded text-sm ${
+                        rmonitorConnected
+                          ? "bg-green-900 text-green-200"
+                          : "bg-gray-700 text-gray-400"
+                      }`}
+                    >
+                      {rmonitorConnected ? "● Connected" : "○ Disconnected"}
+                    </span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-center gap-2">
+                    <label className="flex items-center text-sm text-gray-300 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={showLapCounterAlways}
+                        onChange={(e) =>
+                          setShowLapCounterAlways(e.target.checked)
+                        }
+                        className="mr-2 cursor-pointer"
+                      />
+                      Show Lap Counter Always
+                    </label>
+                  </div>
+                  {rmonitorError && (
+                    <div className="mt-2 p-2 bg-red-900 bg-opacity-50 border border-red-600 rounded text-red-200 text-xs">
+                      {rmonitorError}
+                    </div>
+                  )}
+                </div>
+
+                {/* Keybinds Section */}
+                <div className="space-y-2 w-full max-w-md">
+                  <h3 className="text-base font-semibold text-gray-300 text-center">
+                    Keybinds
+                  </h3>
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
                     <div className="flex justify-between text-gray-300">
                       <span>Clear:</span>
                       <span className="text-blue-400">F1</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Yellow Flash:</span>
+                      <span className="text-blue-400">F5</span>
                     </div>
                     <div className="flex justify-between text-gray-300">
                       <span>Green:</span>
                       <span className="text-blue-400">F2</span>
                     </div>
                     <div className="flex justify-between text-gray-300">
-                      <span>Red:</span>
-                      <span className="text-blue-400">F3</span>
-                    </div>
-                    <div className="flex justify-between text-gray-300">
-                      <span>Yellow:</span>
-                      <span className="text-blue-400">F4</span>
-                    </div>
-                    <div className="flex justify-between text-gray-300">
-                      <span>Settings:</span>
-                      <span className="text-blue-400">F9</span>
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-gray-300">
-                      <span>Yellow Flash:</span>
-                      <span className="text-blue-400">F5</span>
-                    </div>
-                    <div className="flex justify-between text-gray-300">
                       <span>Clear Flag:</span>
                       <span className="text-blue-400">F6</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Red:</span>
+                      <span className="text-blue-400">F3</span>
                     </div>
                     <div className="flex justify-between text-gray-300">
                       <span>White:</span>
                       <span className="text-blue-400">F7</span>
                     </div>
                     <div className="flex justify-between text-gray-300">
+                      <span>Yellow:</span>
+                      <span className="text-blue-400">F4</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
                       <span>Chequered:</span>
                       <span className="text-blue-400">F8</span>
+                    </div>
+                    <div className="flex justify-between text-gray-300">
+                      <span>Settings:</span>
+                      <span className="text-blue-400">F9</span>
                     </div>
                     <div className="flex justify-between text-gray-300">
                       <span>Brightness:</span>
@@ -1384,16 +1615,6 @@ function LEDMaster() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Close Button */}
-              <div className="flex justify-end pt-4">
-                <button
-                  onClick={() => setShowSettingsModal(false)}
-                  className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-sm"
-                >
-                  Close (ESC/F9)
-                </button>
               </div>
             </div>
           </div>
