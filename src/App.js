@@ -74,6 +74,8 @@ function LEDMaster() {
   const [brightness, setBrightness] = useState(100);
   const [flagStandBrightness, setFlagStandBrightness] = useState(100);
   const [flagStandPrevBrightness, setFlagStandPrevBrightness] = useState(100);
+  const [greenDarkeningLevel, setGreenDarkeningLevel] = useState(0);
+  const greenStartTimeRef = useRef(null);
   const [trafficLightShowChequered, setTrafficLightShowChequered] =
     useState(false);
   const [flagStandShowChequered, setFlagStandShowChequered] = useState(false);
@@ -145,6 +147,30 @@ function LEDMaster() {
     }
     return () => clearInterval(interval);
   }, [isRotatingFlag]);
+
+  // Green light darkening effect
+  useEffect(() => {
+    if (trafficLightAction === "GREEN") {
+      if (greenStartTimeRef.current === null) {
+        greenStartTimeRef.current = Date.now();
+        setGreenDarkeningLevel(0);
+      }
+
+      const interval = setInterval(() => {
+        const elapsed = Date.now() - greenStartTimeRef.current;
+        if (elapsed >= 20000) {
+          setGreenDarkeningLevel(2); // 30% darker (15% + 15%)
+        } else if (elapsed >= 10000) {
+          setGreenDarkeningLevel(1); // 15% darker
+        }
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      greenStartTimeRef.current = null;
+      setGreenDarkeningLevel(0);
+    }
+  }, [trafficLightAction]);
 
   // RMonitor WebSocket connection
   useEffect(() => {
@@ -553,6 +579,11 @@ function LEDMaster() {
                   ? COLORS.YELLOW
                   : trafficLightAction === "YELLOW"
                   ? COLORS.YELLOW
+                  : trafficLightAction === "GREEN"
+                  ? adjustBrightness(
+                      COLORS.GREEN,
+                      brightness - (greenDarkeningLevel * 15)
+                    )
                   : adjustBrightness(
                       COLORS[trafficLightAction] || "#000",
                       brightness
