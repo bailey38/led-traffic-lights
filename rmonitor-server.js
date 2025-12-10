@@ -1,19 +1,17 @@
-const dgram = require("dgram");
+const net = require("net");
 const { WebSocketServer } = require("ws");
 
-// RMonitor UDP client configuration
+// RMonitor TCP client configuration
 const RMONITOR_HOST = process.env.RMONITOR_HOST || "127.0.0.1";
 const RMONITOR_PORT = parseInt(process.env.RMONITOR_PORT) || 50000;
 const WS_PORT = 8080;
-
-// Create UDP socket for RMonitor
-const udpClient = dgram.createSocket("udp4");
 
 // Create WebSocket server for browser clients
 const wss = new WebSocketServer({ port: WS_PORT });
 
 let connectedClients = new Set();
 let rmonitorConnected = false;
+let tcpClient = null;
 let lapData = {};
 let raceStatus = {};
 let dataReceivedTimeout = null;
@@ -86,18 +84,21 @@ function parseRMonitorPacket(buffer) {
         // Heartbeat: $HEARTBEAT
         return { type: "HEARTBEAT" };
 
+      case "F":
         // Heartbeat with race status: $F,<lapsToGo>,<timeToGo>,<timeOfDay>,<raceTime>,<flagStatus>
-        const flagStatus = parts[5] ? parts[5].trim() : "Green";
+        // Remove quotes and trim the flag status
+        const flagStatus = parts[5] ? parts[5].replace(/"/g, '').trim() : "Green";
         const lapsToGo = parts[1] || "0";
 
         raceStatus = {
           type: "RACE_STATUS",
-          time: parts[4] || "0", // raceTime
+          time: parts[4] ? parts[4].replace(/"/g, '') : "0", // raceTime
           totalLaps: lapsToGo,
           flag: flagStatus.toUpperCase(),
-          timeToGo: parts[2] || "",
-          timeOfDay: parts[3] || "",
+          timeToGo: parts[2] ? parts[2].replace(/"/g, '') : "",
+          timeOfDay: parts[3] ? parts[3].replace(/"/g, '') : "",
         };
+        console.log("Flag status:", flagStatus.toUpperCase());
         return raceStatus;
 
       default:
@@ -119,33 +120,6 @@ function broadcastToClients(data) {
     }
   });
 }
-
-// Handle incoming UDP messages from RMonitor
-udpClient.on("message", (msg, rinfo) => {
-  const parsed = parseRMonitorPacket(msg);
-  if (parsed) {
-    console.log("RMonitor message:", parsed.type);
-    lastDataReceived = Date.now();
-
-    // Clear and reset the timeout since we received data
-    if (dataReceivedTimeout) {
-      clearTimeout(dataReceivedTimeout);
-      dataReceivedTimeout = null;
-    }
-
-    broadcastToClients(parsed);
-  }
-});
-
-udpClient.on("error", (err) => {
-  console.error("UDP client error:", err);
-  rmonitorConnected = false;
-  broadcastToClients({
-    type: "CONNECTION_STATUS",
-    connected: false,
-    error: err.message,
-  });
-});
 
 // WebSocket server for browser clients
 wss.on("connection", (ws) => {
@@ -193,9 +167,70 @@ wss.on("connection", (ws) => {
           dataReceivedTimeout = null;
         }
 
-        // Bind to receive broadcasts
-        udpClient.bind(port, () => {
-          console.log(`Listening for RMonitor on port ${port}`);
+        // Close existing socket if it exists
+        if (tcpClient) {
+          try {
+            tcpClient.destroy();
+          } catch (e) {
+            // Ignore errors on close
+          }
+        }
+
+        // Create new TCP socket
+        tcpClient = new net.Socket();
+        let buffer = "";
+
+        // Set up data handler
+        tcpClient.on("data", (data) => {
+          buffer += data.toString("utf8");
+          
+          // Split by newlines to handle multiple messages
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep incomplete line in buffer
+
+          lines.forEach((line) => {
+            if (line.trim()) {
+              console.log("Raw message:", line.trim());
+              const parsed = parseRMonitorPacket(Buffer.from(line.trim()));
+              if (parsed) {
+                console.log("RMonitor message:", parsed.type);
+                lastDataReceived = Date.now();
+
+                // Clear and reset the timeout since we received data
+                if (dataReceivedTimeout) {
+                  clearTimeout(dataReceivedTimeout);
+                  dataReceivedTimeout = null;
+                }
+
+                // Broadcast to all connected clients
+                broadcastToClients(parsed);
+              }
+            }
+          });
+        });
+
+        tcpClient.on("error", (err) => {
+          console.error("TCP client error:", err);
+          rmonitorConnected = false;
+          broadcastToClients({
+            type: "CONNECTION_STATUS",
+            connected: false,
+            error: err.message,
+          });
+        });
+
+        tcpClient.on("close", () => {
+          console.log("TCP connection closed");
+          rmonitorConnected = false;
+          broadcastToClients({
+            type: "CONNECTION_STATUS",
+            connected: false,
+          });
+        });
+
+        // Connect to RMonitor
+        tcpClient.connect(port, host, () => {
+          console.log(`Connected to RMonitor at ${host}:${port}`);
           rmonitorConnected = true;
           lastDataReceived = null;
 
@@ -214,8 +249,14 @@ wss.on("connection", (ws) => {
               );
 
               // Disconnect
-              udpClient.close();
-              udpClient.bind(); // Rebind to a new random port
+              if (tcpClient) {
+                try {
+                  tcpClient.destroy();
+                } catch (e) {
+                  // Ignore errors
+                }
+                tcpClient = null;
+              }
               rmonitorConnected = false;
               lapData = {};
               raceStatus = {};
@@ -238,8 +279,14 @@ wss.on("connection", (ws) => {
           dataReceivedTimeout = null;
         }
 
-        udpClient.close();
-        udpClient.bind(); // Rebind to a new random port
+        if (tcpClient) {
+          try {
+            tcpClient.destroy();
+          } catch (e) {
+            // Ignore errors
+          }
+          tcpClient = null;
+        }
         rmonitorConnected = false;
         lapData = {};
         raceStatus = {};
