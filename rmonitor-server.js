@@ -86,11 +86,10 @@ function parseRMonitorPacket(buffer) {
         // Heartbeat: $HEARTBEAT
         return { type: "HEARTBEAT" };
 
-      case "F":
         // Heartbeat with race status: $F,<lapsToGo>,<timeToGo>,<timeOfDay>,<raceTime>,<flagStatus>
         const flagStatus = parts[5] ? parts[5].trim() : "Green";
         const lapsToGo = parts[1] || "0";
-        
+
         raceStatus = {
           type: "RACE_STATUS",
           time: parts[4] || "0", // raceTime

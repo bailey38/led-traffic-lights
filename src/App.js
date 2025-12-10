@@ -80,7 +80,7 @@ function LEDMaster() {
     useState(false);
   const [flagStandShowChequered, setFlagStandShowChequered] = useState(false);
   const [trafficLightBoxWidth, setTrafficLightBoxWidth] = useState(80);
-  const [trafficLightBoxHeight, setTrafficLightBoxHeight] = useState(40);
+  const [trafficLightBoxHeight, setTrafficLightBoxHeight] = useState(80);
   const [flagStandBoxWidth, setFlagStandBoxWidth] = useState(80);
   const [flagStandBoxHeight, setFlagStandBoxHeight] = useState(80);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
