@@ -582,7 +582,7 @@ function LEDMaster() {
                   : trafficLightAction === "GREEN"
                   ? adjustBrightness(
                       COLORS.GREEN,
-                      brightness - (greenDarkeningLevel * 15)
+                      brightness - greenDarkeningLevel * 15
                     )
                   : adjustBrightness(
                       COLORS[trafficLightAction] || "#000",
@@ -1040,17 +1040,6 @@ function LEDMaster() {
           </div>
         </div>
 
-        {/* Lap Counter - Bottom Right */}
-        {(showLapCounterAlways || raceStatus?.totalLaps) && (
-          <div className="absolute bottom-4 right-4 pointer-events-none z-10">
-            <div className="bg-white px-4 py-2">
-              <div className="text-black text-lg font-bold font-mono">
-                Laps: {raceStatus?.totalLaps || 0}
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Lap Data Display - Bottom Center */}
         {Object.keys(lapData).length > 0 && (
           <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 pointer-events-none">
@@ -1087,6 +1076,37 @@ function LEDMaster() {
           </div>
         )}
       </div>{" "}
+      {/* Lap Counter - Bottom Right (outside output area) */}
+      {(showLapCounterAlways || raceStatus?.totalLaps) && (
+        <div className="fixed bottom-4 right-4 z-20">
+          <div
+            className="px-4 py-2"
+            style={{
+              backgroundColor:
+                raceStatus?.flag === "GREEN"
+                  ? "#66ff00"
+                  : raceStatus?.flag === "RED"
+                  ? "#FF0000"
+                  : raceStatus?.flag === "YELLOW"
+                  ? "#ffbf00"
+                  : raceStatus?.flag === "WHITE"
+                  ? "#FFFFFF"
+                  : raceStatus?.flag === "FINISH"
+                  ? "#000000"
+                  : "#FFFFFF",
+            }}
+          >
+            <div
+              className="text-lg font-bold font-mono"
+              style={{
+                color: raceStatus?.flag === "FINISH" ? "#FFFFFF" : "#000000",
+              }}
+            >
+              Laps to go: {raceStatus?.totalLaps || 0}
+            </div>
+          </div>
+        </div>
+      )}
       {/* Button Area - starts below the 320px reserved area */}
       <div
         className="flex flex-col w-full"
